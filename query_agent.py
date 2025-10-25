@@ -28,8 +28,13 @@ class QueryAgent:
         self.DB_LINK = os.getenv("DB_LINK")
         self.GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
         
-        if not self.DB_LINK or not self.GEMINI_API_KEY:
-            raise ValueError("⚠️ Thiếu DB_LINK hoặc GOOGLE_API_KEY trong .env")
+        if not self.GEMINI_API_KEY:
+            print("⚠️ Warning: GOOGLE_API_KEY not found. Some features may not work.")
+            self.GEMINI_API_KEY = "demo-key"  # Fallback for demo
+        
+        if not self.DB_LINK:
+            print("⚠️ Warning: DB_LINK not found. Database features disabled.")
+            self.DB_LINK = None
         
         # Cấu hình MCP Client
         self.config = {
