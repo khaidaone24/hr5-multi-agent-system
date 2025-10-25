@@ -491,7 +491,58 @@ class AnalysisAgent:
                         print(f"    CV Agent result type: {type(cv_result)}")
                         print(f"    CV Agent result keys: {list(cv_result.keys()) if isinstance(cv_result, dict) else 'Not dict'}")
                         
-                        if isinstance(cv_result, dict) and "cv_evaluations" in cv_result:
+                        # Kiểm tra nếu có cấu trúc nested (từ orchestrator)
+                        if isinstance(cv_result, dict) and "result" in cv_result:
+                            print(f"    CV Agent có nested result structure")
+                            nested_result = cv_result.get("result", {})
+                            print(f"    Nested result keys: {list(nested_result.keys()) if isinstance(nested_result, dict) else 'Not dict'}")
+                            
+                            if isinstance(nested_result, dict) and "cv_evaluations" in nested_result:
+                                cv_evaluations = nested_result.get("cv_evaluations", [])
+                                print(f"    CV evaluations count (nested): {len(cv_evaluations)}")
+                                
+                                cv_summary = []
+                                cv_summary.append(f"📋 **KẾT QUẢ PHÂN TÍCH CV CHI TIẾT**")
+                                cv_summary.append(f"Tổng số CV đã phân tích: {len(cv_evaluations)}")
+                                cv_summary.append("")
+                                
+                                for i, evaluation in enumerate(cv_evaluations, 1):
+                                    cv_name = evaluation.get("cv_name", f"CV_{i}")
+                                    status = evaluation.get("status", "Unknown")
+                                    
+                                    print(f"      CV {i}: {cv_name} - {status}")
+                                    
+                                    cv_summary.append(f"**{i}. {cv_name}**")
+                                    cv_summary.append(f"Trạng thái: {status}")
+                                    
+                                    if evaluation.get("best_match"):
+                                        best_match = evaluation["best_match"]
+                                        job_title = best_match.get("job_title", "Unknown")
+                                        score = best_match.get("score", 0)
+                                        analysis = best_match.get("analysis", "")
+                                        
+                                        print(f"        Best match: {job_title} ({score}%)")
+                                        
+                                        cv_summary.append(f"🎯 **Phù hợp nhất với:** {job_title}")
+                                        cv_summary.append(f"⭐ **Điểm số:** {score}%")
+                                        cv_summary.append(f"📝 **Phân tích chi tiết:** {analysis}")
+                                        
+                                        # Hiển thị tất cả đánh giá nếu có
+                                        if evaluation.get("all_evaluations"):
+                                            cv_summary.append("📊 **Tất cả đánh giá:**")
+                                            for eval_item in evaluation["all_evaluations"]:
+                                                eval_job = eval_item.get("job_title", "Unknown")
+                                                eval_score = eval_item.get("score", 0)
+                                                cv_summary.append(f"  - {eval_job}: {eval_score}%")
+                                    
+                                    cv_summary.append("")
+                                
+                                cv_agent_answer = "\n".join(cv_summary)
+                                print(f"    CV Agent answer length (nested): {len(cv_agent_answer)}")
+                            else:
+                                print(f"    Nested result không có cv_evaluations")
+                                cv_agent_answer = "CV Agent đã xử lý nhưng chưa có kết quả chi tiết (nested)"
+                        elif isinstance(cv_result, dict) and "cv_evaluations" in cv_result:
                             cv_evaluations = cv_result.get("cv_evaluations", [])
                             print(f"    CV evaluations count: {len(cv_evaluations)}")
                             
@@ -684,7 +735,21 @@ Yêu cầu định dạng câu trả lời:
                     print(f"    CV Agent result type: {type(cv_result)}")
                     print(f"    CV Agent result keys: {list(cv_result.keys()) if isinstance(cv_result, dict) else 'Not dict'}")
                     
-                    if isinstance(cv_result, dict) and 'cv_evaluations' in cv_result:
+                    # Kiểm tra nếu cv_result có cấu trúc nested (từ orchestrator)
+                    if isinstance(cv_result, dict) and 'result' in cv_result:
+                        print(f"    CV Agent có nested result structure")
+                        nested_result = cv_result.get('result', {})
+                        print(f"    Nested result keys: {list(nested_result.keys()) if isinstance(nested_result, dict) else 'Not dict'}")
+                        
+                        if isinstance(nested_result, dict) and 'cv_evaluations' in nested_result:
+                            cv_count = len(nested_result['cv_evaluations'])
+                            print(f"    CV evaluations count (nested): {cv_count}")
+                            for j, evaluation in enumerate(nested_result['cv_evaluations']):
+                                cv_name = evaluation.get('cv_name', f'CV_{j}')
+                                print(f"      CV {j+1}: {cv_name}")
+                        else:
+                            print(f"    Nested result không có cv_evaluations")
+                    elif isinstance(cv_result, dict) and 'cv_evaluations' in cv_result:
                         cv_count = len(cv_result['cv_evaluations'])
                         print(f"    CV evaluations count: {cv_count}")
                         for j, evaluation in enumerate(cv_result['cv_evaluations']):
