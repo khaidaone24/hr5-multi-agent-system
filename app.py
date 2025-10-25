@@ -157,6 +157,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     
     print("🚀 Starting Multi-Agent HR System Web Interface...")
+    print("✅ FULL VERSION - Not Demo Mode")
     print(f"📱 Open browser and go to: http://localhost:{port}")
     # Chạy 1 process/1 loop ổn định để tránh 'Event loop is closed'
     app.run(debug=False, host='0.0.0.0', port=port, use_reloader=False, threaded=False)
