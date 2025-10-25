@@ -459,7 +459,8 @@
                     console.log('Adding formatted_summary to response');
                     console.log('Formatted summary length:', analysisResult.formatted_summary.length);
                     console.log('Formatted summary preview:', analysisResult.formatted_summary.substring(0, 200));
-                    response += `### 📋 Báo Cáo Chi Tiết\n${analysisResult.formatted_summary}\n\n`;
+                    // Thêm trực tiếp formatted_summary mà không cần header thêm
+                    response += analysisResult.formatted_summary + '\n\n';
                 } else if (analysisResult.markdown) {
                     console.log('Adding markdown to response');
                     response += analysisResult.markdown + '\n\n';
