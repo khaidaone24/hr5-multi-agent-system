@@ -213,6 +213,79 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             margin: 10px 0;
         }
+        
+        /* CSS cho confirmation dialog */
+        .confirmation-dialog {
+            background: linear-gradient(135deg, #fff, #f8f9fa);
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 10px 0;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .confirmation-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 16px;
+        }
+        
+        .confirmation-header i {
+            color: #ffc107;
+            font-size: 18px;
+        }
+        
+        .confirmation-body {
+            margin-bottom: 20px;
+            color: #6c757d;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        
+        .confirmation-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .confirmation-buttons .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 100px;
+        }
+        
+        .confirmation-buttons .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+        
+        .confirmation-buttons .btn-success:hover {
+            background: linear-gradient(135deg, #218838, #1ea085);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+        
+        .confirmation-buttons .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #adb5bd);
+            color: white;
+        }
+        
+        .confirmation-buttons .btn-secondary:hover {
+            background: linear-gradient(135deg, #5a6268, #9ca3af);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -436,8 +509,57 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
         
+        function addConfirmationButtons() {
+            const chatContainer = document.getElementById('chatContainer');
+            const buttonDiv = document.createElement('div');
+            buttonDiv.className = 'message user';
+            buttonDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="confirmation-dialog">
+                        <div class="confirmation-header">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Xác nhận hành động</strong>
+                        </div>
+                        <div class="confirmation-body">
+                            Bạn có chắc chắn muốn quét toàn bộ CV trong hệ thống không? 
+                            Hành động này sẽ phân tích tất cả CV có sẵn và có thể mất thời gian.
+                        </div>
+                        <div class="confirmation-buttons">
+                            <button class="btn btn-success" onclick="confirmAction(true)">
+                                <i class="fas fa-check"></i> Accept
+                            </button>
+                            <button class="btn btn-secondary" onclick="confirmAction(false)">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            chatContainer.appendChild(buttonDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        function confirmAction(confirmed) {
+            if (confirmed) {
+                // Gửi lại request với confirmation
+                sendMessage('Có, quét toàn bộ CV');
+            } else {
+                addMessage('Đã hủy bỏ yêu cầu quét CV.', 'agent');
+            }
+        }
+        
         function displayResult(data) {
             let response = '';
+            
+            // Kiểm tra nếu cần xác nhận
+            if (data.confirmation_required) {
+                response = data.confirmation_message;
+                addMessage(response, 'agent');
+                // Thêm nút xác nhận
+                addConfirmationButtons();
+                return;
+            }
             
             // Kiểm tra nếu là conversational response
             if (data.conversational_response) {

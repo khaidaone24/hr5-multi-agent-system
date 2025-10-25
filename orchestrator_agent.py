@@ -122,7 +122,8 @@ Hãy phân tích và trả về JSON với format:
     "special_requirements": {{
         "needs_data": true/false,
         "needs_chart": true/false,
-        "needs_analysis": true/false
+        "needs_analysis": true/false,
+        "needs_confirmation": true/false
     }},
     "confidence": 0.0-1.0,
     "reasoning": "giải thích lý do lựa chọn",
@@ -133,6 +134,7 @@ Lưu ý đặc biệt:
 - Nếu yêu cầu là CÂU HỎI VỀ CÁCH THỨC, đặt "is_conversational": true và "required_agents": ["conversational_agent"]
 - Nếu yêu cầu là YÊU CẦU THỰC HIỆN HÀNH ĐỘNG, gọi agent chuyên biệt tương ứng
 - Nếu yêu cầu tạo chart/biểu đồ mà không có dữ liệu, PHẢI gọi query_agent trước để lấy dữ liệu
+- Nếu yêu cầu quét/phân tích CV mà không có file cụ thể, đặt "needs_confirmation": true để hỏi xác nhận
 - Có thể gọi nhiều agent theo thứ tự logic
 - Luôn kết thúc bằng analysis_agent để tổng hợp kết quả (trừ conversational)
 - Nếu yêu cầu chỉ là chào hỏi, trò chuyện chung, hoặc không liên quan đến chức năng HR cụ thể, hãy đặt "is_conversational": true và "required_agents": ["conversational_agent"]
@@ -154,7 +156,7 @@ Lưu ý đặc biệt:
                         "primary_intent": "unknown",
                         "required_agents": ["query_agent"],
                         "execution_plan": [{"step": 1, "agent": "query_agent", "reason": "fallback"}],
-                        "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True},
+                        "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True, "needs_confirmation": False},
                         "confidence": 0.5,
                         "reasoning": "LLM response parsing failed, using fallback",
                         "is_conversational": False
@@ -170,7 +172,7 @@ Lưu ý đặc biệt:
                     "primary_intent": "unknown",
                     "required_agents": ["query_agent"],
                     "execution_plan": [{"step": 1, "agent": "query_agent", "reason": "fallback due to parsing error"}],
-                    "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True},
+                    "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True, "needs_confirmation": False},
                     "confidence": 0.3,
                     "reasoning": f"JSON parsing failed: {e}",
                     "is_conversational": False
@@ -183,7 +185,7 @@ Lưu ý đặc biệt:
                 "primary_intent": "error",
                 "required_agents": ["query_agent"],
                 "execution_plan": [{"step": 1, "agent": "query_agent", "reason": "fallback due to error"}],
-                "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True},
+                "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True, "needs_confirmation": False},
                 "confidence": 0.1,
                 "reasoning": f"LLM analysis failed: {e}",
                 "is_conversational": False
@@ -378,7 +380,47 @@ Lưu ý đặc biệt:
         intent_analysis = await self.analyze_intent(user_input)
         print(f" Intent Analysis: {intent_analysis}")
         
-        # Bước 2: Kiểm tra nếu là conversational intent
+        # Kiểm tra nếu người dùng xác nhận quét CV (sau khi đã hiện confirmation)
+        if user_input.lower().strip() in ["có, quét toàn bộ cv", "có", "yes", "ok", "đồng ý", "accept", "xác nhận"]:
+            print(" Orchestrator: Phát hiện xác nhận quét CV, chuyển sang chế độ quét toàn bộ")
+            # Override intent analysis để quét toàn bộ CV
+            intent_analysis = {
+                "primary_intent": "Quét toàn bộ CV trong hệ thống",
+                "required_agents": ["cv_agent", "analysis_agent"],
+                "execution_plan": [
+                    {"step": 1, "agent": "cv_agent", "reason": "Quét toàn bộ CV theo yêu cầu xác nhận của người dùng"},
+                    {"step": 2, "agent": "analysis_agent", "reason": "Tổng hợp kết quả quét CV"}
+                ],
+                "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True, "needs_confirmation": False},
+                "confidence": 1.0,
+                "reasoning": "Người dùng đã xác nhận quét toàn bộ CV",
+                "is_conversational": False
+            }
+        
+        # Bước 2: Kiểm tra nếu cần xác nhận trước khi thực hiện
+        special_requirements = intent_analysis.get("special_requirements", {})
+        if special_requirements.get("needs_confirmation", False) and not uploaded_files:
+            print(" Orchestrator: Phát hiện yêu cầu cần xác nhận, trả về confirmation request")
+            return {
+                "orchestrator": {
+                    "intent_analysis": intent_analysis,
+                    "execution_plan": [],
+                    "timestamp": asyncio.get_event_loop().time()
+                },
+                "execution_summary": {
+                    "total_steps": 0,
+                    "successful_steps": 0,
+                    "failed_steps": 0
+                },
+                "agent_results": [],
+                "final_status": "needs_confirmation",
+                "total_agents_executed": 0,
+                "success_rate": 0.0,
+                "confirmation_required": True,
+                "confirmation_message": f"Bạn có muốn quét toàn bộ CV trong hệ thống không? Hành động này sẽ phân tích tất cả CV có sẵn và có thể mất thời gian."
+            }
+        
+        # Bước 3: Kiểm tra nếu là conversational intent
         if intent_analysis.get("is_conversational", False):
             print(" Orchestrator: Phát hiện conversational intent, gọi Conversational Agent trực tiếp")
             try:
@@ -443,10 +485,10 @@ Lưu ý đặc biệt:
                     "conversational_response": f"Xin lỗi, tôi gặp sự cố kỹ thuật: {e}"
                 }
         
-        # Bước 3: Điều phối đến nhiều agent theo execution plan (cho non-conversational intents)
+        # Bước 4: Điều phối đến nhiều agent theo execution plan (cho non-conversational intents)
         result = await self.route_to_agents(user_input, intent_analysis, uploaded_files)
         
-        # Bước 4: Tổng hợp kết quả cuối cùng
+        # Bước 5: Tổng hợp kết quả cuối cùng
         final_result = {
             "orchestrator": result["orchestrator"],
             "execution_summary": result["execution_summary"],
