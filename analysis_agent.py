@@ -760,6 +760,46 @@ class AnalysisAgent:
                                 
                                 cv_summary.append("")
                             
+                            # Thêm biểu đồ donut chart cho best match
+                            if evaluation.get("best_match"):
+                                best_match = evaluation["best_match"]
+                                score = best_match.get("score", 0)
+                                suitable_percent = score
+                                unsuitable_percent = 100 - score
+                                
+                                try:
+                                    from chart_agent import ChartAgent
+                                    chart_agent = ChartAgent()
+                                    donut_result = chart_agent._create_donut_chart(
+                                        suitable_percent, 
+                                        unsuitable_percent, 
+                                        f"Đánh Giá CV: {cv_name}"
+                                    )
+                                    
+                                    if "chart_file" in donut_result:
+                                        chart_file = donut_result["chart_file"]
+                                        cv_summary.append("**📈 Biểu đồ đánh giá:**")
+                                        cv_summary.append(f"![Donut Chart]({chart_file})")
+                                        cv_summary.append(f"*Biểu đồ: {donut_result.get('title', 'Đánh giá phù hợp')}*")
+                                        cv_summary.append("")
+                                    else:
+                                        # Fallback to text chart
+                                        cv_summary.append("**📈 Biểu đồ đánh giá:**")
+                                        cv_summary.append("```")
+                                        cv_summary.append(f"🔴 Phù hợp: {suitable_percent}%")
+                                        cv_summary.append(f"🟢 Không phù hợp: {unsuitable_percent}%")
+                                        cv_summary.append("```")
+                                        cv_summary.append("")
+                                except Exception as e:
+                                    print(f"    Lỗi tạo biểu đồ: {e}")
+                                    # Fallback to text chart
+                                    cv_summary.append("**📈 Biểu đồ đánh giá:**")
+                                    cv_summary.append("```")
+                                    cv_summary.append(f"🔴 Phù hợp: {suitable_percent}%")
+                                    cv_summary.append(f"🟢 Không phù hợp: {unsuitable_percent}%")
+                                    cv_summary.append("```")
+                                    cv_summary.append("")
+                            
                             cv_agent_answer = "\n".join(cv_summary)
                             print(f"    CV Agent answer length: {len(cv_agent_answer)}")
                         else:
@@ -811,17 +851,20 @@ HƯỚNG DẪN TRẢ LỜI:
 1. ƯU TIÊN sử dụng kết quả từ QueryAgent nếu có
 2. Nếu có CV Agent results, HIỂN THỊ ĐẦY ĐỦ tất cả thông tin CV (KHÔNG tóm tắt)
 3. VỚI CV RESULTS: Hiển thị CHI TIẾT từng vị trí với điểm số, phân tích, strengths, weaknesses
-4. Trả lời TRỰC TIẾP câu hỏi của người dùng
-5. Sử dụng dữ liệu cụ thể từ kết quả
-6. Trả lời tự nhiên như đang nói chuyện
-7. Nếu có dữ liệu bảng, nêu các điểm chính
-8. KHÔNG tóm tắt CV results - hiển thị đầy đủ thông tin
+4. BẮT BUỘC: Hiển thị tất cả detailed_scores, strengths, weaknesses cho từng job position
+5. KHÔNG được tóm tắt - phải hiển thị đầy đủ thông tin từ CV Agent
+6. Sử dụng dữ liệu cụ thể từ kết quả
+7. Trả lời tự nhiên như đang nói chuyện
+8. Nếu có dữ liệu bảng, nêu các điểm chính
+9. VỚI CV: Hiển thị từng job position với đầy đủ thông tin chi tiết
 
 QUAN TRỌNG:
 - CHỈ sử dụng dữ liệu thật từ kết quả agent, KHÔNG tạo dữ liệu giả lập
 - Nếu không có dữ liệu cụ thể, hãy nói rõ "Chưa có dữ liệu cụ thể"
 - KHÔNG được bịa đặt thông tin cá nhân như tên, email, số điện thoại
 - CHỈ hiển thị thông tin có trong kết quả agent
+- VỚI CV: BẮT BUỘC hiển thị đầy đủ detailed_scores, strengths, weaknesses cho TẤT CẢ job positions
+- KHÔNG được tóm tắt CV results - phải hiển thị chi tiết từng vị trí
 
 VÍ DỤ:
 - Người dùng hỏi: "Có bao nhiêu nhân viên?"
@@ -836,19 +879,32 @@ VÍ DỤ:
 - **Điểm số:** 🟢 85%
 - **Phân tích:** [Phân tích chi tiết từ CV Agent]
 - **Phân tích chi tiết:**
-  - Chức danh (80%): [Phân tích chức danh]
-  - Kỹ năng (90%): [Phân tích kỹ năng]
-  - Kinh nghiệm (75%): [Phân tích kinh nghiệm]
-  - Học vấn (85%): [Phân tích học vấn]
+  - Chức danh (80%): [Phân tích chức danh từ CV Agent]
+  - Kỹ năng (90%): [Phân tích kỹ năng từ CV Agent]
+  - Kinh nghiệm (75%): [Phân tích kinh nghiệm từ CV Agent]
+  - Học vấn (85%): [Phân tích học vấn từ CV Agent]
+- **Điểm mạnh:**
+  + [Strengths từ CV Agent - hiển thị đầy đủ]
+- **Điểm cần cải thiện:**
+  - [Weaknesses từ CV Agent - hiển thị đầy đủ]
+
+**🎯 Data Analyst**
+- **Điểm số:** 🟡 65%
+- **Phân tích:** [Phân tích chi tiết từ CV Agent]
+- **Phân tích chi tiết:**
+  - Chức danh (70%): [Phân tích từ CV Agent]
+  - Kỹ năng (75%): [Phân tích từ CV Agent]
+  - Kinh nghiệm (60%): [Phân tích từ CV Agent]
+  - Học vấn (55%): [Phân tích từ CV Agent]
 - **Điểm mạnh:**
   + [Strengths từ CV Agent]
 - **Điểm cần cải thiện:**
   - [Weaknesses từ CV Agent]
 
-**🎯 Data Analyst**
-- **Điểm số:** 🟡 65%
-- **Phân tích:** [Phân tích chi tiết...]
-[Hiển thị đầy đủ tất cả vị trí]"
+**🎯 Software Engineer**
+- **Điểm số:** 🔴 45%
+- **Phân tích:** [Phân tích chi tiết từ CV Agent]
+[Hiển thị đầy đủ tất cả vị trí với chi tiết từng tiêu chí]"
 
 Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đẹp.
 """.format(
