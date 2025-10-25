@@ -610,8 +610,8 @@ Chỉ trả về định dạng JSON này:
             
             # Nếu có file được upload, so sánh với job requirements
             if uploaded_files and len(uploaded_files) > 0:
-                print(" CV Agent: Có file được upload, so sánh với job requirements")
-                return await self._compare_uploaded_cv_with_jobs(uploaded_files[0])
+                print(f" CV Agent: Có {len(uploaded_files)} file được upload, so sánh với job requirements")
+                return await self._compare_multiple_uploaded_cvs_with_jobs(uploaded_files)
             else:
                 # Nếu không có file, quét tất cả CV trong thư mục cvs/
                 print(" CV Agent: Không có file upload, quét tất cả CV trong thư mục")
@@ -672,6 +672,72 @@ Chỉ trả về định dạng JSON này:
                 "status": "error",
                 "error": str(e),
                 "error_type": type(e).__name__
+            }
+
+    async def _compare_multiple_uploaded_cvs_with_jobs(self, cv_filenames: List[str]) -> Dict[str, Any]:
+        """So sánh nhiều CV được upload với job requirements"""
+        try:
+            print(f" CV Agent: So sánh {len(cv_filenames)} CV với job requirements")
+            
+            # Đọc job requirements
+            job_requirements = self._read_job_requirements()
+            if not job_requirements:
+                return {
+                    "agent": "cv_agent",
+                    "status": "error",
+                    "error": "Không thể đọc job requirements"
+                }
+            
+            print(f" CV Agent: Đã đọc {len(job_requirements)} job requirements")
+            
+            all_evaluations = []
+            cv_count = 0
+            
+            # Xử lý từng CV
+            for cv_filename in cv_filenames:
+                print(f" CV Agent: Đang xử lý CV: {cv_filename}")
+                
+                # Đánh giá CV này với tất cả jobs
+                cv_evaluation = await self._evaluate_single_cv(cv_filename, job_requirements)
+                
+                if cv_evaluation and cv_evaluation.get("status") == "success":
+                    all_evaluations.append(cv_evaluation)
+                    cv_count += 1
+                    print(f" CV Agent: Hoàn thành đánh giá CV {cv_filename}")
+                else:
+                    print(f" CV Agent: Lỗi đánh giá CV {cv_filename}")
+            
+            if cv_count == 0:
+                return {
+                    "agent": "cv_agent",
+                    "status": "error",
+                    "error": "Không thể đánh giá CV nào"
+                }
+            
+            # Tìm best match cho mỗi CV
+            for evaluation in all_evaluations:
+                if evaluation.get("all_evaluations"):
+                    best_match = max(evaluation["all_evaluations"], key=lambda x: x.get("score", 0))
+                    evaluation["best_match"] = best_match
+            
+            return {
+                "agent": "cv_agent",
+                "status": "success",
+                "result": {
+                    "message": f"Đã phân tích {cv_count} CV",
+                    "cv_count": cv_count,
+                    "cv_evaluations": all_evaluations,
+                    "average_score": sum(eval.get("best_match", {}).get("score", 0) for eval in all_evaluations) / cv_count if cv_count > 0 else 0,
+                    "status": "success"
+                }
+            }
+            
+        except Exception as e:
+            print(f" CV Agent: Lỗi trong _compare_multiple_uploaded_cvs_with_jobs: {e}")
+            return {
+                "agent": "cv_agent",
+                "status": "error",
+                "error": str(e)
             }
 
     async def _compare_uploaded_cv_with_jobs(self, uploaded_file: str) -> Dict[str, Any]:
