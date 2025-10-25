@@ -41,11 +41,11 @@ class QueryAgent:
             "mcpServers": {
                 "postgres": {
                     "command": "uv",
-                    "args": [
-                        "run",
-                        "postgres-mcp",
-                        "--access-mode=unrestricted",
-                    ],
+                "args": [
+                    "run",
+                    "postgres-mcp",
+                    "--access-mode=unrestricted",
+                ],
                     "env": {
                         "DATABASE_URI": self.DB_LINK
                     },
@@ -81,16 +81,28 @@ class QueryAgent:
                 
                 # Fix common JSON issues
                 cleaned_txt = txt
-                # Replace NaN with null
+                print(f"🔧 Query Agent - Raw response: {cleaned_txt[:200]}...")
+                
+                # Replace NaN with null (multiple patterns)
                 cleaned_txt = re.sub(r'\bNaN\b', 'null', cleaned_txt)
+                cleaned_txt = re.sub(r':\s*NaN\s*', ': null', cleaned_txt)
+                cleaned_txt = re.sub(r'"NaN"', 'null', cleaned_txt)
+                
                 # Replace Infinity with null
                 cleaned_txt = re.sub(r'\bInfinity\b', 'null', cleaned_txt)
+                cleaned_txt = re.sub(r':\s*Infinity\s*', ': null', cleaned_txt)
+                
                 # Replace -Infinity with null
                 cleaned_txt = re.sub(r'\b-Infinity\b', 'null', cleaned_txt)
+                cleaned_txt = re.sub(r':\s*-Infinity\s*', ': null', cleaned_txt)
+                
                 # Fix Decimal objects
                 cleaned_txt = re.sub(r"Decimal\('([^']+)'\)", r'\1', cleaned_txt)
-                # Fix single quotes to double quotes for JSON
-                cleaned_txt = cleaned_txt.replace("'", '"')
+                
+                # Fix single quotes to double quotes for JSON (but be careful with strings)
+                # Only replace single quotes that are not inside strings
+                cleaned_txt = re.sub(r"'([^']*)':", r'"\1":', cleaned_txt)
+                cleaned_txt = re.sub(r":\s*'([^']*)'", r': "\1"', cleaned_txt)
                 
                 print(f"🔧 Query Agent - Cleaned response: {cleaned_txt[:200]}...")
                 
@@ -135,15 +147,29 @@ class QueryAgent:
                         return result
                 except Exception as ast_error:
                     print(f"⚠️ Query Agent - ast.literal_eval cũng lỗi: {ast_error}")
-            
-            # Fallback: trả về raw text
-            return {"columns": ["result"], "data": [[txt]]}
+                
+                # Thử parse với json.loads với ignore errors
+                try:
+                    import json
+                    # Try to parse as JSON with strict=False
+                    obj = json.loads(txt, strict=False)
+                    if isinstance(obj, list) and obj:
+                        cols = list(obj[0].keys())
+                        rows = [[row.get(c) for c in cols] for row in obj]
+                        result = {"columns": cols, "data": rows}
+                        print(f"✅ Query Agent - Parse JSON với strict=False thành công: {result}")
+                        return result
+                except Exception as json_error:
+                    print(f"⚠️ Query Agent - JSON strict=False cũng lỗi: {json_error}")
+                
+                # Fallback: trả về raw text
+                return {"columns": ["result"], "data": [[txt]]}
             
         except Exception as e:
             print(f"❌ Query Agent - Lỗi execute_sql: {e}")
             # try list_objects/dry path
             return {"columns": ["result"], "data": [["Query failed"]]}
-    
+
 
     async def get_table_details(self, table_name: str) -> dict:
         """Lấy thông tin chi tiết của một bảng cụ thể"""
@@ -557,13 +583,13 @@ class QueryAgent:
                             print(f"🔍 Query Agent - Số dòng text: {len(lines)}")
                             for i, line in enumerate(lines):
                                 print(f"🔍 Query Agent - Dòng {i}: {line}")
-                                if "'name':" in line:
+                            if "'name':" in line:
                                     try:
                                         # Tìm tất cả 'name': trong dòng
                                         parts = line.split("'name':")
                                         for part in parts[1:]:  # Bỏ qua phần đầu
                                             name = part.split("'")[1]
-                                            schema_map[name.lower()] = "public"
+                                schema_map[name.lower()] = "public"
                                             table_names.append(name)
                                             print(f"✅ Query Agent - Tìm thấy bảng (text): {name}")
                                     except Exception as parse_error:
