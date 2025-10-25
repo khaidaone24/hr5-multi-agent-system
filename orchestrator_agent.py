@@ -317,7 +317,12 @@ Lưu ý đặc biệt:
                         if 'cv_evaluations' in result.get('result', {}):
                             cv_count = len(result['result']['cv_evaluations'])
                             print(f"    CV evaluations count: {cv_count}")
-                return await agent.process(user_input, accumulated_results or [])
+                
+                print(f" Orchestrator: Gọi Analysis Agent với user_input: {user_input}")
+                print(f" Orchestrator: Accumulated results: {accumulated_results}")
+                result = await agent.process(user_input, accumulated_results or [])
+                print(f" Orchestrator: Analysis Agent result: {result}")
+                return result
                 
             else:
                 return {

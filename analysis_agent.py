@@ -311,7 +311,7 @@ class AnalysisAgent:
             elif agent_name == "chart_agent":
                 if key_data["files_created"]:
                     return f"✅ Tạo biểu đồ thành công: {key_data['data_summary']}"
-                else:
+            else:
                     return "✅ Tạo biểu đồ thành công"
             else:
                 return "✅ Xử lý thành công"
@@ -790,7 +790,7 @@ class AnalysisAgent:
                                         cv_summary.append(f"![Donut Chart]({chart_file})")
                                         cv_summary.append(f"*Biểu đồ: {donut_result.get('title', 'Đánh giá phù hợp')}*")
                                         cv_summary.append("")
-                                    else:
+                                else:
                                         # Fallback to text chart
                                         cv_summary.append("**📈 Biểu đồ đánh giá:**")
                                         cv_summary.append("```")
