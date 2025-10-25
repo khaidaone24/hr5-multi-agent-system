@@ -114,6 +114,8 @@ def process_request():
         
         # Get session-specific system instance
         system = get_or_create_system()
+        session_id = session.get('session_id', 'unknown')
+        print(f"[DEBUG] Using session: {session_id}")
         
         # Clean up old sessions periodically
         cleanup_old_sessions()
@@ -127,6 +129,19 @@ def process_request():
             # Convert numpy/pandas-like types for JSON serialization
             def convert_numpy_types(obj):
                 try:
+                    # Handle Decimal objects first (from database)
+                    if hasattr(obj, '__class__') and obj.__class__.__name__ == 'Decimal':
+                        return float(obj)
+                    
+                    # Handle NaN, Infinity values
+                    if isinstance(obj, float):
+                        if str(obj).lower() in ['nan', 'inf', '-inf', 'infinity', '-infinity']:
+                            return None
+                    
+                    # Handle datetime objects
+                    if hasattr(obj, 'isoformat'):
+                        return obj.isoformat()
+                    
                     # numpy arrays and scalars
                     if np is not None:
                         if isinstance(obj, np.ndarray):
@@ -139,6 +154,21 @@ def process_request():
                             return str(obj)
                         if isinstance(obj, (np.dtype,)):
                             return str(obj)
+                        # Handle numpy NaN/Inf
+                        if isinstance(obj, np.floating):
+                            if np.isnan(obj) or np.isinf(obj):
+                                return None
+                    
+                    # pandas objects
+                    try:
+                        import pandas as pd
+                        if isinstance(obj, pd.Series):
+                            return obj.tolist()
+                        if isinstance(obj, pd.DataFrame):
+                            return obj.to_dict('records')
+                    except ImportError:
+                        pass
+                    
                     # built-ins and containers
                     if hasattr(obj, 'item'):
                         return obj.item()
@@ -147,12 +177,19 @@ def process_request():
                     if isinstance(obj, (list, tuple, set)):
                         return [convert_numpy_types(item) for item in obj]
                     return obj
-                except Exception:
+                except Exception as e:
+                    print(f"[DEBUG] Error converting object {type(obj)}: {e}")
                     # last resort stringify
                     return str(obj)
             
             print(f"[DEBUG] Converting numpy types")
+            print(f"[DEBUG] Result type: {type(result)}")
+            print(f"[DEBUG] Result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
+            
             result_clean = convert_numpy_types(result)
+            print(f"[DEBUG] Clean result type: {type(result_clean)}")
+            print(f"[DEBUG] Clean result keys: {result_clean.keys() if isinstance(result_clean, dict) else 'Not a dict'}")
+            
             print(f"[DEBUG] Returning clean result")
             return jsonify(result_clean)
             
