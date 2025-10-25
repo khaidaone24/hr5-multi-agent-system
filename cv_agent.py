@@ -660,14 +660,20 @@ Return ONLY this JSON format:
             # Tìm job phù hợp nhất
             best_match = max(evaluations, key=lambda x: x['score'])
             
+            # Tính điểm trung bình
+            valid_scores = [e['score'] for e in evaluations if isinstance(e['score'], (int, float))]
+            average_score = sum(valid_scores) / len(valid_scores) if valid_scores else 0
+            
             print(f" CV Agent: Hoàn thành đánh giá {len(evaluations)} jobs")
             print(f" CV Agent: Best match: {best_match['job_title']} ({best_match['score']}%)")
+            print(f" CV Agent: Average score: {average_score:.1f}%")
             
             return {
                 "cv_name": Path(cv_path).name,
                 "cv_key_info": cv_key_info,
                 "best_match": best_match,
                 "all_evaluations": evaluations,
+                "average_score": round(average_score, 2),
                 "status": "success"
             }
             
