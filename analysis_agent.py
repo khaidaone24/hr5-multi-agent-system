@@ -307,6 +307,7 @@ class AnalysisAgent:
             )
             # Chuẩn bị prompt cho AI
             results_summary = {}
+            query_agent_answer = None
             for agent_name, result in agent_results.items():
                 if result:
                     results_summary[agent_name] = {
@@ -314,6 +315,9 @@ class AnalysisAgent:
                         "has_data": bool(result.get("result")),
                         "error": result.get("error") if result.get("status") == "error" else None
                     }
+                    # Ưu tiên sử dụng final_answer từ QueryAgent
+                    if agent_name == "query_agent" and result.get("final_answer"):
+                        query_agent_answer = result.get("final_answer")
             
             # Thêm thông tin về dữ liệu bảng nếu có
             table_summary = ""
@@ -325,27 +329,32 @@ Bạn là một chuyên gia phân tích dữ liệu HR. Hãy trả lời câu h�
 
 Yêu cầu người dùng: {user_input}
 
-Kết quả từ các agent:
+Kết quả từ QueryAgent (nếu có):
+{query_agent_answer}
+
+Kết quả từ các agent khác:
 {results_summary}
 
 Dữ liệu chính được truy vấn (nếu có):
 {table_summary}
 
 HƯỚNG DẪN TRẢ LỜI:
-1. Trả lời TRỰC TIẾP câu hỏi của người dùng (ví dụ: "Công ty có 25 nhân viên")
-2. Sử dụng dữ liệu cụ thể từ kết quả
-3. Trả lời tự nhiên như đang nói chuyện
-4. Nếu có dữ liệu bảng, nêu các điểm chính (phòng ban nào có nhiều nhân viên nhất, etc.)
-5. Thêm insights ngắn gọn nếu hữu ích
+1. ƯU TIÊN sử dụng kết quả từ QueryAgent nếu có
+2. Trả lời TRỰC TIẾP câu hỏi của người dùng (ví dụ: "Công ty có 25 nhân viên")
+3. Sử dụng dữ liệu cụ thể từ kết quả
+4. Trả lời tự nhiên như đang nói chuyện
+5. Nếu có dữ liệu bảng, nêu các điểm chính (phòng ban nào có nhiều nhân viên nhất, etc.)
+6. Thêm insights ngắn gọn nếu hữu ích
 
 VÍ DỤ:
 - Người dùng hỏi: "Có bao nhiêu nhân viên?"
-- Dữ liệu: [{{'count': 25}}]
+- QueryAgent trả về: "Công ty hiện có 25 nhân viên"
 - Trả lời: "Công ty hiện có **25 nhân viên**. Đây là tổng số nhân viên đang làm việc tại công ty."
 
 Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đẹp.
 """.format(
                 user_input=user_input,
+                query_agent_answer=query_agent_answer or "Không có kết quả từ QueryAgent",
                 results_summary=json.dumps(results_summary, ensure_ascii=False, indent=2),
                 table_summary=table_summary
             )
@@ -407,9 +416,13 @@ Yêu cầu định dạng câu trả lời:
             # Debug: In chi tiết từng agent result
             for i, result in enumerate(agent_results):
                 print(f" Analysis Agent: Result {i}: agent={result.get('agent')}, status={result.get('status')}")
-                if result.get('agent') == 'query_agent' and result.get('result'):
-                    print(f" Analysis Agent: Query result type: {type(result['result'])}")
-                    print(f" Analysis Agent: Query result content: {str(result['result'])[:200]}...")
+                if result.get('agent') == 'query_agent':
+                    # Ưu tiên sử dụng final_answer từ QueryAgent
+                    if result.get('final_answer'):
+                        print(f" Analysis Agent: Query final_answer: {str(result['final_answer'])[:200]}...")
+                    elif result.get('result'):
+                        print(f" Analysis Agent: Query result type: {type(result['result'])}")
+                        print(f" Analysis Agent: Query result content: {str(result['result'])[:200]}...")
             
             # Trích xuất kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
