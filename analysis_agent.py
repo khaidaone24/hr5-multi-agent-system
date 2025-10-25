@@ -308,6 +308,8 @@ class AnalysisAgent:
             # Chuẩn bị prompt cho AI
             results_summary = {}
             query_agent_answer = None
+            cv_agent_answer = None
+            
             for agent_name, result in agent_results.items():
                 if result:
                     results_summary[agent_name] = {
@@ -318,6 +320,23 @@ class AnalysisAgent:
                     # Ưu tiên sử dụng final_answer từ QueryAgent
                     if agent_name == "query_agent" and result.get("final_answer"):
                         query_agent_answer = result.get("final_answer")
+                    # Xử lý CV Agent results
+                    elif agent_name == "cv_agent" and result.get("result"):
+                        cv_result = result["result"]
+                        if isinstance(cv_result, dict) and "cv_evaluations" in cv_result:
+                            cv_evaluations = cv_result.get("cv_evaluations", [])
+                            cv_summary = []
+                            for evaluation in cv_evaluations:
+                                cv_name = evaluation.get("cv_name", "Unknown")
+                                if evaluation.get("best_match"):
+                                    best_match = evaluation["best_match"]
+                                    job_title = best_match.get("job_title", "Unknown")
+                                    score = best_match.get("score", 0)
+                                    analysis = best_match.get("analysis", "")
+                                    cv_summary.append(f"- {cv_name}: Phù hợp nhất với {job_title} ({score}%) - {analysis[:100]}...")
+                                else:
+                                    cv_summary.append(f"- {cv_name}: {evaluation.get('status', 'Unknown')}")
+                            cv_agent_answer = f"Đã phân tích {len(cv_evaluations)} CV:\n" + "\n".join(cv_summary)
             
             # Thêm thông tin về dữ liệu bảng nếu có
             table_summary = ""
@@ -332,6 +351,9 @@ Yêu cầu người dùng: {user_input}
 Kết quả từ QueryAgent (nếu có):
 {query_agent_answer}
 
+Kết quả từ CV Agent (nếu có):
+{cv_agent_answer}
+
 Kết quả từ các agent khác:
 {results_summary}
 
@@ -340,21 +362,27 @@ Dữ liệu chính được truy vấn (nếu có):
 
 HƯỚNG DẪN TRẢ LỜI:
 1. ƯU TIÊN sử dụng kết quả từ QueryAgent nếu có
-2. Trả lời TRỰC TIẾP câu hỏi của người dùng (ví dụ: "Công ty có 25 nhân viên")
-3. Sử dụng dữ liệu cụ thể từ kết quả
-4. Trả lời tự nhiên như đang nói chuyện
-5. Nếu có dữ liệu bảng, nêu các điểm chính (phòng ban nào có nhiều nhân viên nhất, etc.)
-6. Thêm insights ngắn gọn nếu hữu ích
+2. Nếu có CV Agent results, hiển thị chi tiết đánh giá CV
+3. Trả lời TRỰC TIẾP câu hỏi của người dùng
+4. Sử dụng dữ liệu cụ thể từ kết quả
+5. Trả lời tự nhiên như đang nói chuyện
+6. Nếu có dữ liệu bảng, nêu các điểm chính
+7. Thêm insights ngắn gọn nếu hữu ích
 
 VÍ DỤ:
 - Người dùng hỏi: "Có bao nhiêu nhân viên?"
 - QueryAgent trả về: "Công ty hiện có 25 nhân viên"
 - Trả lời: "Công ty hiện có **25 nhân viên**. Đây là tổng số nhân viên đang làm việc tại công ty."
 
+- Người dùng hỏi: "Quét CV này"
+- CV Agent trả về: "CV_John.pdf phù hợp nhất với Business Analyst (85%)"
+- Trả lời: "Đã phân tích CV của bạn. **Kết quả đánh giá**: CV này phù hợp nhất với vị trí **Business Analyst** với điểm số **85%**. [Chi tiết phân tích...]"
+
 Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đẹp.
 """.format(
                 user_input=user_input,
                 query_agent_answer=query_agent_answer or "Không có kết quả từ QueryAgent",
+                cv_agent_answer=cv_agent_answer or "Không có kết quả từ CV Agent",
                 results_summary=json.dumps(results_summary, ensure_ascii=False, indent=2),
                 table_summary=table_summary
             )
@@ -423,6 +451,25 @@ Yêu cầu định dạng câu trả lời:
                     elif result.get('result'):
                         print(f" Analysis Agent: Query result type: {type(result['result'])}")
                         print(f" Analysis Agent: Query result content: {str(result['result'])[:200]}...")
+                elif result.get('agent') == 'cv_agent':
+                    # Debug CV Agent results
+                    if result.get('result'):
+                        cv_result = result['result']
+                        print(f" Analysis Agent: CV Agent result type: {type(cv_result)}")
+                        if isinstance(cv_result, dict):
+                            print(f" Analysis Agent: CV Agent keys: {list(cv_result.keys())}")
+                            if 'cv_evaluations' in cv_result:
+                                cv_count = len(cv_result.get('cv_evaluations', []))
+                                print(f" Analysis Agent: CV Agent found {cv_count} CV evaluations")
+                                for j, evaluation in enumerate(cv_result.get('cv_evaluations', [])):
+                                    cv_name = evaluation.get('cv_name', 'Unknown')
+                                    status = evaluation.get('status', 'Unknown')
+                                    print(f" Analysis Agent: CV {j+1}: {cv_name} - {status}")
+                                    if evaluation.get('best_match'):
+                                        best_match = evaluation['best_match']
+                                        job_title = best_match.get('job_title', 'Unknown')
+                                        score = best_match.get('score', 0)
+                                        print(f" Analysis Agent: Best match: {job_title} ({score}%)")
             
             # Trích xuất kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
