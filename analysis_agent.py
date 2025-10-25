@@ -293,13 +293,13 @@ class AnalysisAgent:
             if first_table_data and first_table_data.get("data"):
                 table_summary = self._summarize_table_for_user(first_table_data)
 
-            prompt = f"""
+            prompt = """
 Bạn là một chuyên gia phân tích dữ liệu HR. Hãy trả lời câu hỏi của người dùng một cách tự nhiên và hữu ích.
 
 Yêu cầu người dùng: {user_input}
 
 Kết quả từ các agent:
-{json.dumps(results_summary, ensure_ascii=False, indent=2)}
+{results_summary}
 
 Dữ liệu chính được truy vấn (nếu có):
 {table_summary}
@@ -313,11 +313,15 @@ HƯỚNG DẪN TRẢ LỜI:
 
 VÍ DỤ:
 - Người dùng hỏi: "Có bao nhiêu nhân viên?"
-- Dữ liệu: [{'count': 25}]
+- Dữ liệu: [{{'count': 25}}]
 - Trả lời: "Công ty hiện có **25 nhân viên**. Đây là tổng số nhân viên đang làm việc tại công ty."
 
 Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đẹp.
-"""
+""".format(
+                user_input=user_input,
+                results_summary=json.dumps(results_summary, ensure_ascii=False, indent=2),
+                table_summary=table_summary
+            )
             
             response = await llm.ainvoke(prompt)
             return response.content if hasattr(response, 'content') else str(response)
