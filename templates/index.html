@@ -454,7 +454,9 @@
             
             if (data.analysis_result && data.analysis_result.result) {
                 const analysisResult = data.analysis_result.result;
-                if (analysisResult.markdown) {
+                if (analysisResult.formatted_summary) {
+                    response += `### 📋 Báo Cáo Chi Tiết\n${analysisResult.formatted_summary}\n\n`;
+                } else if (analysisResult.markdown) {
                     response += analysisResult.markdown + '\n\n';
                 } else if (analysisResult.ai_analysis) {
                     response += `### 🧠 Phân tích AI\n${analysisResult.ai_analysis}\n\n`;
