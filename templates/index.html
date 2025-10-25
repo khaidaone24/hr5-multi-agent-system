@@ -454,11 +454,17 @@
             
             if (data.analysis_result && data.analysis_result.result) {
                 const analysisResult = data.analysis_result.result;
+                console.log('Analysis result:', analysisResult);
                 if (analysisResult.formatted_summary) {
+                    console.log('Adding formatted_summary to response');
+                    console.log('Formatted summary length:', analysisResult.formatted_summary.length);
+                    console.log('Formatted summary preview:', analysisResult.formatted_summary.substring(0, 200));
                     response += `### 📋 Báo Cáo Chi Tiết\n${analysisResult.formatted_summary}\n\n`;
                 } else if (analysisResult.markdown) {
+                    console.log('Adding markdown to response');
                     response += analysisResult.markdown + '\n\n';
                 } else if (analysisResult.ai_analysis) {
+                    console.log('Adding ai_analysis to response');
                     response += `### 🧠 Phân tích AI\n${analysisResult.ai_analysis}\n\n`;
                 }
             }
@@ -508,6 +514,8 @@
                 response = '✅ Đã xử lý yêu cầu thành công! (Không có dữ liệu hiển thị)';
             }
             
+            console.log('Final response length:', response.length);
+            console.log('Final response preview:', response.substring(0, 500));
             addMessage(response, 'agent');
         }
     </script>
