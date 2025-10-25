@@ -45,6 +45,15 @@ def index():
     """Trang chủ"""
     return render_template('index.html')
 
+@app.route('/api/status')
+def health_check():
+    """Health check endpoint for Railway"""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0"
+    })
+
 @app.route('/api/process', methods=['POST'])
 def process_request():
     """Xử lý yêu cầu từ người dùng"""

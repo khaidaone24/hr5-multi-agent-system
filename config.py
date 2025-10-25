@@ -22,12 +22,12 @@ class Config:
     LLM_MAX_TOKENS = 4000
     
     # MCP Server paths
-    WREN_MCP_SERVER_PATH = os.getenv("WREN_MCP_SERVER_PATH", "D:/HR4/wren-engine/mcp-server/app/wren.py")
+    WREN_MCP_SERVER_PATH = os.getenv("WREN_MCP_SERVER_PATH", "wren.py")
     CV_MCP_SERVER_PATH = "cv_mcp_server.py"
     
-    # File paths
-    CV_FOLDER = Path("D:/HR4/PDF")
-    JOB_REQUIREMENTS_FILE = Path("D:/HR4/job_requirements/job_requirements.xlsx")
+    # File paths (use relative paths for Railway)
+    CV_FOLDER = Path("uploads")
+    JOB_REQUIREMENTS_FILE = Path("job_requirements.xlsx")
     CHART_OUTPUT_DIR = Path("charts")
     CACHE_DIR = Path("cache")
     

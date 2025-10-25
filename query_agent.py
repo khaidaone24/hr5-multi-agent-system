@@ -417,6 +417,12 @@ class QueryAgent:
             try:
                 print(" Query Agent: Dang khoi tao MCP Client...")
                 
+                # Check if we're in Railway/production environment
+                if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('PORT'):
+                    print(" Query Agent: Detected production environment")
+                    # In production, we might need to handle MCP differently
+                    # For now, we'll try to initialize but gracefully handle failures
+                
                 # Kiểm tra MCPClient có method from_dict không
                 if hasattr(MCPClient, 'from_dict'):
                     print(" Query Agent: Su dung MCPClient.from_dict")
