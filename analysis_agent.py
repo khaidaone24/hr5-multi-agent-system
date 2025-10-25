@@ -228,7 +228,9 @@ class AnalysisAgent:
         report["key_findings"] = self._generate_key_findings(agent_results)
         
         # Tạo formatted summary
+        print(f"🧠 Analysis Agent: Creating formatted summary...")
         report["formatted_summary"] = self._create_formatted_summary(agent_results, user_input)
+        print(f"🧠 Analysis Agent: Formatted summary length: {len(report['formatted_summary'])}")
         
         return report
     
@@ -351,6 +353,7 @@ class AnalysisAgent:
     
     def _create_formatted_summary(self, agent_results: Dict[str, Any], user_input: str) -> str:
         """Tạo summary được format đẹp mắt"""
+        print(f"🧠 Analysis Agent: Creating formatted summary for {len(agent_results)} agents")
         summary_parts = []
         
         # Header
@@ -575,7 +578,10 @@ class AnalysisAgent:
                 
                 summary_parts.append("")
         
-        return "\n".join(summary_parts)
+        result = "\n".join(summary_parts)
+        print(f"🧠 Analysis Agent: Formatted summary created, length: {len(result)}")
+        print(f"🧠 Analysis Agent: Summary preview: {result[:300]}...")
+        return result
     
     def _summarize_table_for_user(self, table_data: Dict[str, Any]) -> str:
         """Tạo tóm tắt bảng dữ liệu cho người dùng bằng LLM."""
@@ -1022,6 +1028,8 @@ Yêu cầu định dạng câu trả lời:
             
             # Tạo markdown summary đẹp mắt (đã có đầy đủ thông tin)
             markdown_summary = summary_report.get("formatted_summary", "")
+            print(f"🧠 Analysis Agent: Markdown summary length: {len(markdown_summary)}")
+            print(f"🧠 Analysis Agent: Markdown preview: {markdown_summary[:200]}...")
 
             return {
                 "agent": "analysis_agent",
