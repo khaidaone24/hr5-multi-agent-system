@@ -8,8 +8,9 @@ import json
 import os
 import sys
 import traceback
+import threading
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session
 from werkzeug.utils import secure_filename
 import uuid
 from datetime import datetime
@@ -32,8 +33,36 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs('charts', exist_ok=True)
 
-# Initialize Multi-Agent System
-system = MultiAgentSystem()
+# Thread-safe system instances storage
+system_instances = {}
+system_lock = threading.Lock()
+
+def get_or_create_system():
+    """Get or create system instance for current session"""
+    session_id = session.get('session_id')
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        session['session_id'] = session_id
+    
+    with system_lock:
+        if session_id not in system_instances:
+            print(f"🆕 Creating new system instance for session: {session_id}")
+            system_instances[session_id] = MultiAgentSystem()
+        return system_instances[session_id]
+
+def cleanup_old_sessions():
+    """Clean up old session instances to prevent memory leaks"""
+    import time
+    current_time = time.time()
+    
+    with system_lock:
+        # Keep only last 10 sessions to prevent memory issues
+        if len(system_instances) > 10:
+            # Remove oldest sessions (simple FIFO)
+            oldest_sessions = list(system_instances.keys())[:-10]
+            for session_id in oldest_sessions:
+                print(f"🧹 Cleaning up old session: {session_id}")
+                del system_instances[session_id]
 
 ALLOWED_EXTENSIONS = {'pdf'}
 
@@ -59,6 +88,15 @@ def health():
     """Health check endpoint for Docker"""
     return "OK", 200
 
+@app.route('/api/sessions')
+def get_sessions():
+    """Get current session information"""
+    with system_lock:
+        return jsonify({
+            "active_sessions": len(system_instances),
+            "session_ids": list(system_instances.keys())
+        })
+
 @app.route('/api/process', methods=['POST'])
 def process_request():
     """Xử lý yêu cầu từ người dùng"""
@@ -73,6 +111,12 @@ def process_request():
         
         if not user_input:
             return jsonify({'error': 'Vui long nhap yeu cau'}), 400
+        
+        # Get session-specific system instance
+        system = get_or_create_system()
+        
+        # Clean up old sessions periodically
+        cleanup_old_sessions()
         
         # Process with asyncio.run to avoid closed loop issues
         try:
