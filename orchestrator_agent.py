@@ -149,7 +149,7 @@ Lưu ý đặc biệt:
                 return result
                 
             except json.JSONDecodeError as e:
-                print(f"⚠️ JSON parsing error: {e}")
+                print(f" JSON parsing error: {e}")
                 # Fallback response
                 return {
                     "primary_intent": "unknown",
@@ -161,7 +161,7 @@ Lưu ý đặc biệt:
                 }
                 
         except Exception as e:
-            print(f"❌ LLM analysis error: {e}")
+            print(f" LLM analysis error: {e}")
             # Fallback response
             return {
                 "primary_intent": "error",
@@ -227,7 +227,7 @@ Lưu ý đặc biệt:
                     accumulated_data = agent_result["result"]
                 
                 routing_result["execution_summary"]["successful_steps"] += 1
-                print(f"✅ Step {step_num} completed successfully")
+                print(f" Step {step_num} completed successfully")
                 
             except Exception as e:
                 error_result = {
@@ -241,7 +241,7 @@ Lưu ý đặc biệt:
                 
                 routing_result["agent_results"].append(error_result)
                 routing_result["execution_summary"]["failed_steps"] += 1
-                print(f"❌ Step {step_num} failed: {e}")
+                print(f" Step {step_num} failed: {e}")
         
         return routing_result
     
@@ -330,11 +330,11 @@ Lưu ý đặc biệt:
         """
         Xử lý request chính của orchestrator với LLM analysis và multi-agent execution
         """
-        print(f"🎯 Orchestrator: Phân tích intent cho '{user_input}'")
+        print(f" Orchestrator: Phân tích intent cho '{user_input}'")
         
         # Bước 1: Phân tích intent bằng LLM
         intent_analysis = await self.analyze_intent(user_input)
-        print(f"📊 Intent Analysis: {intent_analysis}")
+        print(f" Intent Analysis: {intent_analysis}")
         
         # Bước 2: Điều phối đến nhiều agent theo execution plan
         result = await self.route_to_agents(user_input, intent_analysis, uploaded_files)
@@ -387,20 +387,20 @@ async def test_orchestrator():
         try:
             result = await orchestrator.process(test_case['input'])
             
-            print(f"✅ Execution Summary:")
+            print(f" Execution Summary:")
             print(f"  - Total Steps: {result['execution_summary']['total_steps']}")
             print(f"  - Successful: {result['execution_summary']['successful_steps']}")
             print(f"  - Failed: {result['execution_summary']['failed_steps']}")
             print(f"  - Success Rate: {result['success_rate']:.2%}")
             
-            print(f"\n📋 Agent Results:")
+            print(f"\n Agent Results:")
             for agent_result in result['agent_results']:
                 print(f"  Step {agent_result['step']}: {agent_result['agent']} - {agent_result['status']}")
                 if agent_result['status'] == 'error':
                     print(f"    Error: {agent_result.get('error', 'Unknown error')}")
             
         except Exception as e:
-            print(f"❌ Test failed: {e}")
+            print(f" Test failed: {e}")
         
         print("-" * 60)
 

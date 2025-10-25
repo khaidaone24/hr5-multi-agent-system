@@ -24,7 +24,7 @@ class CVAgent:
         load_dotenv()
         self.GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
         if not self.GEMINI_API_KEY:
-            raise ValueError("⚠️ Thiếu GOOGLE_API_KEY trong .env")
+            raise ValueError(" Thiếu GOOGLE_API_KEY trong .env")
         
         # Cấu hình Gemini
         genai.configure(api_key=self.GEMINI_API_KEY)
@@ -259,11 +259,11 @@ Return ONLY this JSON format:
             error_msg = str(e)
             
             if "429" in error_msg or "quota" in error_msg.lower():
-                print(f"⚠️ Rate limit hit! Waiting 60 seconds...")
+                print(f" Rate limit hit! Waiting 60 seconds...")
                 time.sleep(60)
                 return 0, f"Rate limit exceeded. Please wait and try again."
             else:
-                print(f"❌ Gemini error: {error_msg[:100]}")
+                print(f" Gemini error: {error_msg[:100]}")
                 return 0, f"API Error: {error_msg[:100]}"
     
     async def process(self, user_input: str) -> Dict[str, Any]:
@@ -271,7 +271,7 @@ Return ONLY this JSON format:
         Xử lý yêu cầu phân tích CV
         """
         try:
-            print(f"📄 CV Agent: Xử lý yêu cầu '{user_input}'")
+            print(f" CV Agent: Xử lý yêu cầu '{user_input}'")
             
             # Phân tích intent cụ thể
             if "so sánh" in user_input.lower() or "compare" in user_input.lower():
@@ -442,7 +442,7 @@ Return ONLY this JSON format:
     async def _find_candidates(self, user_input: str) -> Dict[str, Any]:
         """Tìm ứng viên phù hợp dựa trên yêu cầu"""
         try:
-            print("🔍 CV Agent: Tìm kiếm ứng viên phù hợp...")
+            print(" CV Agent: Tìm kiếm ứng viên phù hợp...")
             
             # Load CV data
             cv_data = self.extract_cvs_from_folder(str(self.cv_folder))

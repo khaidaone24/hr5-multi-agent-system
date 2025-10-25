@@ -10,14 +10,14 @@ try:
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    print("⚠️ Warning: langchain_google_genai not available")
+    print(" Warning: langchain_google_genai not available")
 
 try:
     import pandas as pd
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
-    print("⚠️ Warning: pandas not available")
+    print(" Warning: pandas not available")
 
 from datetime import datetime
 
@@ -32,7 +32,7 @@ class AnalysisAgent:
         
         # Không raise exception, chỉ warning
         if not self.GEMINI_API_KEY:
-            print("⚠️ Warning: GOOGLE_API_KEY not found, AI analysis will be disabled")
+            print(" Warning: GOOGLE_API_KEY not found, AI analysis will be disabled")
             self.GEMINI_API_KEY = None
         
         # Lưu cấu hình, KHÔNG khởi tạo LLM ở đây để tránh gắn với event loop cũ
@@ -391,8 +391,8 @@ Yêu cầu định dạng câu trả lời:
         Xử lý phân tích tổng hợp
         """
         try:
-            print(f"🔍 Analysis Agent: Phân tích kết quả cho '{user_input}'")
-            print(f"🔍 Analysis Agent: Số lượng agent results: {len(agent_results) if agent_results else 0}")
+            print(f" Analysis Agent: Phân tích kết quả cho '{user_input}'")
+            print(f" Analysis Agent: Số lượng agent results: {len(agent_results) if agent_results else 0}")
             
             if not agent_results:
                 return {
@@ -406,10 +406,10 @@ Yêu cầu định dạng câu trả lời:
             
             # Debug: In chi tiết từng agent result
             for i, result in enumerate(agent_results):
-                print(f"🔍 Analysis Agent: Result {i}: agent={result.get('agent')}, status={result.get('status')}")
+                print(f" Analysis Agent: Result {i}: agent={result.get('agent')}, status={result.get('status')}")
                 if result.get('agent') == 'query_agent' and result.get('result'):
-                    print(f"🔍 Analysis Agent: Query result type: {type(result['result'])}")
-                    print(f"🔍 Analysis Agent: Query result content: {str(result['result'])[:200]}...")
+                    print(f" Analysis Agent: Query result type: {type(result['result'])}")
+                    print(f" Analysis Agent: Query result content: {str(result['result'])[:200]}...")
             
             # Trích xuất kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
@@ -457,7 +457,7 @@ Yêu cầu định dạng câu trả lời:
                 table_md = "\n".join([header, sep, body])
 
             # Sử dụng ai_analysis làm câu trả lời chính
-            markdown_summary = f"### ✅ Trả lời\n{ai_analysis}"
+            markdown_summary = f"###  Trả lời\n{ai_analysis}"
 
             return {
                 "agent": "analysis_agent",

@@ -69,7 +69,7 @@ class Config:
         cls.CHART_OUTPUT_DIR.mkdir(exist_ok=True)
         cls.CACHE_DIR.mkdir(exist_ok=True)
         
-        print(f"✅ Created directories: {cls.CHART_OUTPUT_DIR}, {cls.CACHE_DIR}")
+        print(f" Created directories: {cls.CHART_OUTPUT_DIR}, {cls.CACHE_DIR}")
 
 # Agent configurations
 class AgentConfig:
@@ -235,10 +235,10 @@ def initialize_config():
     try:
         Config.validate()
         Config.setup_directories()
-        print("✅ Configuration initialized successfully")
+        print(" Configuration initialized successfully")
         return True
     except Exception as e:
-        print(f"❌ Configuration initialization failed: {e}")
+        print(f" Configuration initialization failed: {e}")
         return False
 
 if __name__ == "__main__":

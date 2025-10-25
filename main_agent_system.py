@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 import sys
+import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
@@ -34,13 +36,13 @@ class MultiAgentSystem:
         # Lịch sử conversation
         self.conversation_history = []
         
-        print("🚀 Multi-Agent System đã khởi tạo!")
-        print("📋 Các agent có sẵn:")
-        print("  - Orchestrator: Phân tích intent và điều phối")
-        print("  - Query Agent: Truy vấn cơ sở dữ liệu")
-        print("  - CV Agent: Phân tích CV và ứng viên")
-        print("  - Chart Agent: Tạo biểu đồ và trực quan hóa")
-        print("  - Analysis Agent: Tổng hợp và phân tích kết quả")
+        print("Multi-Agent System da khoi tao!")
+        print("Cac agent co san:")
+        print("  - Orchestrator: Phan tich intent va dieu phoi")
+        print("  - Query Agent: Truy van co so du lieu")
+        print("  - CV Agent: Phan tich CV va ung vien")
+        print("  - Chart Agent: Tao bieu do va truc quan hoa")
+        print("  - Analysis Agent: Tong hop va phan tich ket qua")
     
     async def process_single_request(self, user_input: str, uploaded_files: List[str] = None) -> Dict[str, Any]:
         """
@@ -48,9 +50,9 @@ class MultiAgentSystem:
         """
         try:
             print(f"\n{'='*60}")
-            print(f"🎯 Xử lý yêu cầu: {user_input}")
+            print(f"Xu ly yeu cau: {user_input}")
             if uploaded_files:
-                print(f"📁 Uploaded files: {', '.join(uploaded_files)}")
+                print(f"Uploaded files: {', '.join(uploaded_files)}")
             print(f"{'='*60}")
             
             # Nếu có uploaded files, thêm vào user_input
@@ -58,7 +60,7 @@ class MultiAgentSystem:
                 user_input += f" [Uploaded files: {', '.join(uploaded_files)}]"
             
             # Bước 1: Orchestrator phân tích intent và thực thi multi-agent
-            print("🔍 Orchestrator: Phân tích intent và thực thi multi-agent...")
+            print("Orchestrator: Phan tich intent va thuc thi multi-agent...")
             orchestrator_result = await self.orchestrator.process(user_input, uploaded_files)
             
             # Thêm uploaded_files vào result để CV Agent có thể sử dụng
@@ -102,11 +104,11 @@ class MultiAgentSystem:
         """
         try:
             print(f"\n{'='*60}")
-            print(f"🎯 Xử lý yêu cầu với phân tích: {user_input}")
+            print(f"Xu ly yeu cau voi phan tich: {user_input}")
             print(f"{'='*60}")
             
             # Bước 1: Orchestrator phân tích intent
-            print("🔍 Orchestrator: Phân tích intent...")
+            print("Orchestrator: Phan tich intent...")
             orchestrator_result = await self.orchestrator.process(user_input)
             
             # Bước 2: Thu thập kết quả từ các agent
@@ -117,7 +119,7 @@ class MultiAgentSystem:
                 agent_results.append(orchestrator_result["agent_result"])
             
             # Bước 3: Analysis Agent phân tích tổng hợp
-            print("🔍 Analysis Agent: Phân tích tổng hợp...")
+            print(" Analysis Agent: Phân tích tổng hợp...")
             analysis_result = await self.analysis_agent.process(user_input, agent_results)
             
             # Bước 4: Tổng hợp kết quả cuối cùng
@@ -154,25 +156,25 @@ class MultiAgentSystem:
         """
         try:
             print(f"\n{'='*60}")
-            print(f"🎯 Workflow {workflow_type}: {user_input}")
+            print(f" Workflow {workflow_type}: {user_input}")
             print(f"{'='*60}")
             
             if workflow_type == "query_then_chart":
                 # Workflow: Query -> Chart
-                print("📊 Workflow: Query -> Chart")
+                print(" Workflow: Query -> Chart")
                 
                 # Bước 1: Query Agent
-                print("🔍 Query Agent: Truy vấn dữ liệu...")
+                print(" Query Agent: Truy vấn dữ liệu...")
                 query_result = await self.query_agent.process(user_input)
                 
                 # Bước 2: Chart Agent (nếu query thành công)
                 chart_result = None
                 if query_result.get("status") == "success" and query_result.get("result"):
-                    print("📊 Chart Agent: Tạo biểu đồ...")
+                    print(" Chart Agent: Tạo biểu đồ...")
                     chart_result = await self.chart_agent.process("Tạo biểu đồ từ dữ liệu query", query_result.get("result"))
                 
                 # Bước 3: Analysis Agent
-                print("🔍 Analysis Agent: Phân tích tổng hợp...")
+                print(" Analysis Agent: Phân tích tổng hợp...")
                 analysis_result = await self.analysis_agent.process(user_input, [query_result, chart_result])
                 
                 return {
@@ -186,14 +188,14 @@ class MultiAgentSystem:
             
             elif workflow_type == "cv_analysis":
                 # Workflow: CV Analysis
-                print("📄 Workflow: CV Analysis")
+                print(" Workflow: CV Analysis")
                 
                 # Bước 1: CV Agent
-                print("📄 CV Agent: Phân tích CV...")
+                print(" CV Agent: Phân tích CV...")
                 cv_result = await self.cv_agent.process(user_input)
                 
                 # Bước 2: Analysis Agent
-                print("🔍 Analysis Agent: Phân tích tổng hợp...")
+                print(" Analysis Agent: Phân tích tổng hợp...")
                 analysis_result = await self.analysis_agent.process(user_input, [cv_result])
                 
                 return {
@@ -206,10 +208,10 @@ class MultiAgentSystem:
             
             elif workflow_type == "full_analysis":
                 # Workflow: Full Analysis (tất cả agents)
-                print("🔍 Workflow: Full Analysis")
+                print(" Workflow: Full Analysis")
                 
                 # Chạy tất cả agents song song
-                print("🚀 Chạy tất cả agents song song...")
+                print(" Chạy tất cả agents song song...")
                 tasks = [
                     self.query_agent.process(user_input),
                     self.cv_agent.process(user_input),
@@ -222,7 +224,7 @@ class MultiAgentSystem:
                 successful_results = [r for r in results if isinstance(r, dict) and r.get("status") == "success"]
                 
                 # Analysis Agent
-                print("🔍 Analysis Agent: Phân tích tổng hợp...")
+                print(" Analysis Agent: Phân tích tổng hợp...")
                 analysis_result = await self.analysis_agent.process(user_input, successful_results)
                 
                 return {
@@ -249,7 +251,7 @@ class MultiAgentSystem:
     def show_menu(self):
         """Hiển thị menu"""
         print("\n" + "="*60)
-        print("🤖 MULTI-AGENT HR SYSTEM")
+        print(" MULTI-AGENT HR SYSTEM")
         print("="*60)
         print("1. Xử lý yêu cầu thông thường (Orchestrator)")
         print("2. Xử lý với phân tích tổng hợp")
@@ -278,13 +280,13 @@ class MultiAgentSystem:
         """Test agent riêng lẻ"""
         try:
             if agent_choice == "1":  # Query Agent
-                print("🔍 Testing Query Agent...")
+                print(" Testing Query Agent...")
                 result = await self.query_agent.process(test_input)
             elif agent_choice == "2":  # CV Agent
-                print("📄 Testing CV Agent...")
+                print(" Testing CV Agent...")
                 result = await self.cv_agent.process(test_input)
             elif agent_choice == "3":  # Chart Agent
-                print("📊 Testing Chart Agent...")
+                print(" Testing Chart Agent...")
                 # Tạo dữ liệu test cho chart
                 test_data = {
                     "columns": ["PhongBan", "SoLuong"],
@@ -292,7 +294,7 @@ class MultiAgentSystem:
                 }
                 result = await self.chart_agent.process(test_input, test_data)
             elif agent_choice == "4":  # Analysis Agent
-                print("🔍 Testing Analysis Agent...")
+                print(" Testing Analysis Agent...")
                 # Mock results cho test
                 mock_results = [
                     {"agent": "query_agent", "status": "success", "result": {"data": "test"}},
@@ -300,34 +302,34 @@ class MultiAgentSystem:
                 ]
                 result = await self.analysis_agent.process(test_input, mock_results)
             elif agent_choice == "5":  # Orchestrator
-                print("🎯 Testing Orchestrator...")
+                print(" Testing Orchestrator...")
                 result = await self.orchestrator.process(test_input)
             else:
                 result = {"error": "Invalid agent choice"}
             
-            print(f"\n📋 Kết quả:")
+            print(f"\n Kết quả:")
             print(json.dumps(result, ensure_ascii=False, indent=2))
             
         except Exception as e:
-            print(f"❌ Lỗi test agent: {e}")
+            print(f" Lỗi test agent: {e}")
     
     async def run_interactive(self):
         """Chạy hệ thống tương tác"""
-        print("🚀 Khởi động Multi-Agent HR System...")
+        print(" Khởi động Multi-Agent HR System...")
         
         while True:
             self.show_menu()
             choice = input("Chọn chức năng (0-7): ").strip()
             
             if choice == "0":
-                print("👋 Tạm biệt!")
+                print(" Tạm biệt!")
                 break
             
             elif choice == "1":
                 user_input = input("Nhập yêu cầu: ").strip()
                 if user_input:
                     result = await self.process_single_request(user_input)
-                    print(f"\n📋 Kết quả:")
+                    print(f"\n Kết quả:")
                     # Convert numpy types to Python types for JSON serialization
                     def convert_numpy_types(obj):
                         if hasattr(obj, 'item'):
@@ -346,7 +348,7 @@ class MultiAgentSystem:
                 user_input = input("Nhập yêu cầu: ").strip()
                 if user_input:
                     result = await self.process_with_analysis(user_input)
-                    print(f"\n📋 Kết quả:")
+                    print(f"\n Kết quả:")
                     # Convert numpy types to Python types for JSON serialization
                     def convert_numpy_types(obj):
                         if hasattr(obj, 'item'):
@@ -365,7 +367,7 @@ class MultiAgentSystem:
                 user_input = input("Nhập yêu cầu query: ").strip()
                 if user_input:
                     result = await self.process_workflow(user_input, "query_then_chart")
-                    print(f"\n📋 Kết quả:")
+                    print(f"\n Kết quả:")
                     # Convert numpy types to Python types for JSON serialization
                     def convert_numpy_types(obj):
                         if hasattr(obj, 'item'):
@@ -384,7 +386,7 @@ class MultiAgentSystem:
                 user_input = input("Nhập yêu cầu CV analysis: ").strip()
                 if user_input:
                     result = await self.process_workflow(user_input, "cv_analysis")
-                    print(f"\n📋 Kết quả:")
+                    print(f"\n Kết quả:")
                     # Convert numpy types to Python types for JSON serialization
                     def convert_numpy_types(obj):
                         if hasattr(obj, 'item'):
@@ -403,7 +405,7 @@ class MultiAgentSystem:
                 user_input = input("Nhập yêu cầu full analysis: ").strip()
                 if user_input:
                     result = await self.process_workflow(user_input, "full_analysis")
-                    print(f"\n📋 Kết quả:")
+                    print(f"\n Kết quả:")
                     # Convert numpy types to Python types for JSON serialization
                     def convert_numpy_types(obj):
                         if hasattr(obj, 'item'):
@@ -419,7 +421,7 @@ class MultiAgentSystem:
                     print(json.dumps(result_clean, ensure_ascii=False, indent=2))
             
             elif choice == "6":
-                print(f"\n📚 Lịch sử conversation ({len(self.conversation_history)} entries):")
+                print(f"\n Lịch sử conversation ({len(self.conversation_history)} entries):")
                 for i, entry in enumerate(self.conversation_history[-5:], 1):  # Hiển thị 5 entries gần nhất
                     print(f"{i}. {entry['user_input'][:50]}...")
                     print(f"   Timestamp: {entry['timestamp']}")
@@ -433,13 +435,13 @@ class MultiAgentSystem:
                         await self.test_individual_agent(agent_choice, test_input)
             
             else:
-                print("❌ Lựa chọn không hợp lệ!")
+                print(" Lựa chọn không hợp lệ!")
             
             print("\n" + "="*60)
     
     async def run_demo(self):
         """Chạy demo với các test cases"""
-        print("🎬 Chạy demo Multi-Agent System...")
+        print(" Chạy demo Multi-Agent System...")
         
         demo_cases = [
             "Tìm nhân viên có lương cao nhất",
@@ -450,20 +452,20 @@ class MultiAgentSystem:
         
         for i, demo_input in enumerate(demo_cases, 1):
             print(f"\n{'='*60}")
-            print(f"🎬 Demo Case {i}: {demo_input}")
+            print(f" Demo Case {i}: {demo_input}")
             print(f"{'='*60}")
             
             try:
                 result = await self.process_single_request(demo_input)
-                print(f"📋 Kết quả:")
+                print(f" Kết quả:")
                 print(json.dumps(result, ensure_ascii=False, indent=2))
             except Exception as e:
-                print(f"❌ Lỗi demo case {i}: {e}")
+                print(f"Lỗi demo case {i}: {e}")
             
             # Delay giữa các demo
             await asyncio.sleep(2)
         
-        print("\n🎉 Demo hoàn thành!")
+        print("\n Demo hoàn thành!")
 
 async def main():
     """Main function"""
@@ -480,7 +482,7 @@ async def main():
     elif mode == "2":
         await system.run_demo()
     else:
-        print("❌ Chế độ không hợp lệ!")
+        print(" Chế độ không hợp lệ!")
 
 if __name__ == "__main__":
     asyncio.run(main())

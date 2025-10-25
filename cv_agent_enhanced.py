@@ -30,7 +30,7 @@ class EnhancedCVAgent:
         self.gemini_api_key = os.getenv("GOOGLE_API_KEY")
         
         if not self.gemini_api_key:
-            raise ValueError("⚠️ Thiếu GOOGLE_API_KEY trong .env")
+            raise ValueError(" Thiếu GOOGLE_API_KEY trong .env")
         
         # Khởi tạo Gemini AI
         genai.configure(api_key=self.gemini_api_key)
@@ -164,7 +164,7 @@ class EnhancedCVAgent:
             for filename in uploaded_files:
                 filepath = self.upload_dir / filename
                 if filepath.exists():
-                    print(f"📄 CV Agent: Phân tích file {filename}")
+                    print(f" CV Agent: Phân tích file {filename}")
                     
                     # Trích xuất text từ PDF
                     cv_text = self._extract_text_from_pdf(str(filepath))
@@ -227,11 +227,11 @@ class EnhancedCVAgent:
                     }
                 }
             
-            print(f"📁 CV Agent: Tìm thấy {len(pdf_files)} file CV, bắt đầu phân tích...")
+            print(f" CV Agent: Tìm thấy {len(pdf_files)} file CV, bắt đầu phân tích...")
             
             results = []
             for pdf_file in pdf_files:
-                print(f"📄 CV Agent: Phân tích {pdf_file.name}")
+                print(f" CV Agent: Phân tích {pdf_file.name}")
                 
                 # Trích xuất text từ PDF
                 cv_text = self._extract_text_from_pdf(str(pdf_file))
@@ -278,16 +278,16 @@ class EnhancedCVAgent:
         Xử lý yêu cầu phân tích CV với khả năng xử lý file upload
         """
         try:
-            print(f"🔍 CV Agent: Xử lý yêu cầu '{user_input}'")
+            print(f" CV Agent: Xử lý yêu cầu '{user_input}'")
             
             # Xử lý file upload nếu có
             if uploaded_files:
-                print(f"📁 CV Agent: Xử lý {len(uploaded_files)} file(s) đã upload")
+                print(f" CV Agent: Xử lý {len(uploaded_files)} file(s) đã upload")
                 return await self._process_uploaded_files(uploaded_files, user_input)
             else:
                 # Nếu không có file upload nhưng intent có CV, quét tất cả CV
                 if self._has_cv_intent(user_input):
-                    print("📁 CV Agent: Không có file upload, quét tất cả CV có sẵn")
+                    print(" CV Agent: Không có file upload, quét tất cả CV có sẵn")
                     return await self._scan_all_cvs(user_input)
                 else:
                     return {

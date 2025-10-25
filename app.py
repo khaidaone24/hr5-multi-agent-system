@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
@@ -48,16 +49,22 @@ def index():
 def process_request():
     """Xử lý yêu cầu từ người dùng"""
     try:
+        print(f"[DEBUG] Starting process_request")
         data = request.get_json()
         user_input = data.get('input', '').strip()
         uploaded_files = data.get('files', [])
         
+        print(f"[DEBUG] User input: {user_input}")
+        print(f"[DEBUG] Uploaded files: {uploaded_files}")
+        
         if not user_input:
-            return jsonify({'error': 'Vui lòng nhập yêu cầu'}), 400
+            return jsonify({'error': 'Vui long nhap yeu cau'}), 400
         
         # Process with asyncio.run to avoid closed loop issues
         try:
+            print(f"[DEBUG] Calling system.process_single_request")
             result = asyncio.run(system.process_single_request(user_input, uploaded_files))
+            print(f"[DEBUG] Got result from system: {type(result)}")
             
             # Convert numpy/pandas-like types for JSON serialization
             def convert_numpy_types(obj):
@@ -86,25 +93,32 @@ def process_request():
                     # last resort stringify
                     return str(obj)
             
+            print(f"[DEBUG] Converting numpy types")
             result_clean = convert_numpy_types(result)
+            print(f"[DEBUG] Returning clean result")
             return jsonify(result_clean)
+            
+        except Exception as e:
+            print(f"[DEBUG] Error in asyncio.run: {e}")
+            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+            raise e
             
         finally:
             pass
             
     except Exception as e:
-        return jsonify({'error': f'Lỗi xử lý: {str(e)}'}), 500
+        return jsonify({'error': f'Loi xu ly: {str(e)}'}), 500
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
     """Upload file PDF"""
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'Không có file được chọn'}), 400
+            return jsonify({'error': 'Khong co file duoc chon'}), 400
         
         file = request.files['file']
         if file.filename == '':
-            return jsonify({'error': 'Không có file được chọn'}), 400
+            return jsonify({'error': 'Khong co file duoc chon'}), 400
         
         if file and allowed_file(file.filename):
             # Generate unique filename
@@ -117,13 +131,13 @@ def upload_file():
                 'success': True,
                 'filename': unique_filename,
                 'original_name': filename,
-                'message': 'File đã được upload thành công'
+                'message': 'File da duoc upload thanh cong'
             })
         else:
-            return jsonify({'error': 'Chỉ cho phép file PDF'}), 400
+            return jsonify({'error': 'Chi cho phep file PDF'}), 400
             
     except Exception as e:
-        return jsonify({'error': f'Lỗi upload: {str(e)}'}), 500
+        return jsonify({'error': f'Loi upload: {str(e)}'}), 500
 
 @app.route('/api/charts/<filename>')
 def get_chart(filename):
@@ -133,9 +147,9 @@ def get_chart(filename):
         if os.path.exists(chart_path):
             return send_file(chart_path, mimetype='image/png')
         else:
-            return jsonify({'error': 'File biểu đồ không tồn tại'}), 404
+            return jsonify({'error': 'File bieu do khong ton tai'}), 404
     except Exception as e:
-        return jsonify({'error': f'Lỗi tải biểu đồ: {str(e)}'}), 500
+        return jsonify({'error': f'Loi tai bieu do: {str(e)}'}), 500
 
 @app.route('/api/status')
 def get_status():
@@ -156,8 +170,8 @@ if __name__ == '__main__':
     # Get port from environment variable (for deployment platforms)
     port = int(os.environ.get('PORT', 5000))
     
-    print("🚀 Starting Multi-Agent HR System Web Interface...")
-    print("✅ FULL VERSION - Not Demo Mode")
-    print(f"📱 Open browser and go to: http://localhost:{port}")
+    print("Starting Multi-Agent HR System Web Interface...")
+    print("FULL VERSION - Not Demo Mode")
+    print(f"Open browser and go to: http://localhost:{port}")
     # Chạy 1 process/1 loop ổn định để tránh 'Event loop is closed'
     app.run(debug=False, host='0.0.0.0', port=port, use_reloader=False, threaded=False)
