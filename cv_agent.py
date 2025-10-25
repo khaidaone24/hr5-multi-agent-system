@@ -262,36 +262,36 @@ KEY CANDIDATE INFO:
 - Contact: {', '.join(cv_key_info.get('emails', []))}
 """
         
-        prompt = f"""You are an expert HR recruiter. Analyze this candidate against the job requirements.
+        prompt = f"""Bạn là chuyên gia tuyển dụng HR. Phân tích ứng viên này so với yêu cầu công việc.
 
 {key_info_str}
 
-=== FULL CV CONTENT ===
+=== NỘI DUNG CV ĐẦY ĐỦ ===
 {cv_text[:8000]}
 
-=== JOB REQUIREMENTS ===
+=== YÊU CẦU CÔNG VIỆC ===
 {job_text[:2000]}
 
-Evaluate the match (0-100) based on:
-1. Job Title alignment
-2. Skills match  
-3. Experience level
-4. Education background
+Đánh giá mức độ phù hợp (0-100) dựa trên:
+1. Sự phù hợp chức danh
+2. Kỹ năng phù hợp  
+3. Mức độ kinh nghiệm
+4. Trình độ học vấn
 
-IMPORTANT: Return ONLY valid JSON. Keep analysis short (max 100 chars each).
+QUAN TRỌNG: Chỉ trả về JSON hợp lệ. Giữ phân tích ngắn gọn (tối đa 100 ký tự mỗi phần).
 
-Return ONLY this JSON format:
+Chỉ trả về định dạng JSON này:
 {{
-    "overall_score": <integer 0-100>,
+    "overall_score": <số nguyên 0-100>,
     "detailed_scores": {{
-        "job_title": {{"score": <integer>, "analysis": "<short analysis>"}},
-        "skills": {{"score": <integer>, "analysis": "<short analysis>"}},
-        "experience": {{"score": <integer>, "analysis": "<short analysis>"}},
-        "education": {{"score": <integer>, "analysis": "<short analysis>"}}
+        "job_title": {{"score": <số nguyên>, "analysis": "<phân tích ngắn>"}},
+        "skills": {{"score": <số nguyên>, "analysis": "<phân tích ngắn>"}},
+        "experience": {{"score": <số nguyên>, "analysis": "<phân tích ngắn>"}},
+        "education": {{"score": <số nguyên>, "analysis": "<phân tích ngắn>"}}
     }},
-    "strengths": ["<strength 1>", "<strength 2>"],
-    "weaknesses": ["<weakness 1>", "<weakness 2>"],
-    "summary": "<brief summary>"
+    "strengths": ["<điểm mạnh 1>", "<điểm mạnh 2>"],
+    "weaknesses": ["<điểm yếu 1>", "<điểm yếu 2>"],
+    "summary": "<tóm tắt ngắn gọn>"
 }}
 """
         
