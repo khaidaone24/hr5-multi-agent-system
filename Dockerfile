@@ -11,12 +11,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv for MCP
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
-
-# Install postgres-mcp using uv
-RUN uv tool install postgres-mcp
+# Install MCP dependencies via pip (more reliable than uv on Railway)
+RUN pip install --no-cache-dir mcp
 
 # Copy requirements first for better caching
 COPY requirements.txt .

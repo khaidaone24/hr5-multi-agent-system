@@ -36,22 +36,25 @@ class QueryAgent:
             print(" Warning: DB_LINK not found. Database features disabled.")
             self.DB_LINK = None
         
-        # Cấu hình MCP Client
-        self.config = {
-            "mcpServers": {
-                "postgres": {
-                    "command": "uv",
-                "args": [
-                    "run",
-                    "postgres-mcp",
-                    "--access-mode=unrestricted",
-                ],
-                    "env": {
-                        "DATABASE_URI": self.DB_LINK
-                    },
+        # Cấu hình MCP Client (fallback to direct DB connection on Railway)
+        if os.getenv('RAILWAY_ENVIRONMENT'):
+            print(" Query Agent: Railway environment detected - using direct DB connection")
+            self.config = None  # Will use direct PostgreSQL connection
+        else:
+            self.config = {
+                "mcpServers": {
+                    "postgres": {
+                        "command": "python",
+                        "args": [
+                            "-m", "mcp.server.postgres",
+                            "--access-mode=unrestricted",
+                        ],
+                        "env": {
+                            "DATABASE_URI": self.DB_LINK
+                        },
+                    }
                 }
             }
-        }
         
         # Initialize schema-related attributes
         self.schema_details = {}
@@ -128,7 +131,7 @@ class QueryAgent:
             return {"columns": ["result"], "data": [["Query failed"]]}
     
     async def _railway_fallback_sql(self, sql: str) -> dict:
-        """Fallback SQL execution cho Railway khi MCP Client không khả dụng"""
+        """Fallback SQL execution cho Railway - sử dụng mock data"""
         print(f"🔄 Query Agent - Railway fallback SQL: {sql}")
         
         # Mock data cho Railway environment
