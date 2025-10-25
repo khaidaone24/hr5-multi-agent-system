@@ -319,15 +319,13 @@ class AnalysisAgent:
                 "cv_count": len(cv_evaluations),
                 "successful_analysis": len([e for e in cv_evaluations if e.get("status") == "success"])
             }
-        
-            elif agent_name == "chart_agent":
+        elif agent_name == "chart_agent":
             key_data["data_type"] = "chart_creation"
             key_data["data_summary"] = result_data.get("summary", "Tạo biểu đồ")
             key_data["files_created"] = result_data.get("files_created", [])
             key_data["metrics"] = {
                 "charts_created": len(key_data["files_created"])
             }
-        
         elif agent_name == "query_agent":
             key_data["data_type"] = "data_query"
             key_data["data_summary"] = result_data.get("summary", "Truy vấn dữ liệu")
