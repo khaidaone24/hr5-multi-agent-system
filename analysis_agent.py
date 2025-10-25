@@ -303,13 +303,13 @@ class AnalysisAgent:
             "files_created": [],
             "full_cv_data": []
         }
-        
+
         if result.get("status") != "success":
             return key_data
-        
-            agent_name = result.get("agent", "unknown")
+
+        agent_name = result.get("agent", "unknown")
         result_data = result.get("result", {})
-        
+
         if agent_name == "cv_agent":
             key_data["data_type"] = "cv_analysis"
             cv_evaluations = self._extract_cv_evaluations(result_data)
@@ -319,6 +319,7 @@ class AnalysisAgent:
                 "cv_count": len(cv_evaluations),
                 "successful_analysis": len([e for e in cv_evaluations if e.get("status") == "success"])
             }
+
         elif agent_name == "chart_agent":
             key_data["data_type"] = "chart_creation"
             key_data["data_summary"] = result_data.get("summary", "Tạo biểu đồ")
@@ -326,13 +327,14 @@ class AnalysisAgent:
             key_data["metrics"] = {
                 "charts_created": len(key_data["files_created"])
             }
+
         elif agent_name == "query_agent":
             key_data["data_type"] = "data_query"
             key_data["data_summary"] = result_data.get("summary", "Truy vấn dữ liệu")
             key_data["metrics"] = {
                 "rows_returned": result_data.get("row_count", 0)
             }
-        
+
         return key_data
     
     def _generate_key_findings(self, agent_results: Dict[str, Any]) -> List[str]:
