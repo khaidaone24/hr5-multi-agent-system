@@ -4,7 +4,7 @@ import os
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 # Setup logging
 logging.basicConfig(
@@ -248,6 +248,184 @@ class CVAgent:
         
         return cv_data
     
+    def compare_cv_job_with_gemini_chunked(self, cv_text: str, job_text: str, cv_key_info: Dict[str, Any]) -> Tuple[int, str, Dict[str, Any]]:
+        """So sánh CV với job requirements sử dụng chunked requests để tránh truncated"""
+        try:
+            print(f" CV Agent: Bắt đầu chunked analysis...")
+            
+            # Step 1: Lấy overall score và summary
+            overall_result = self._get_overall_score(cv_text, job_text, cv_key_info)
+            if not overall_result:
+                return 0, "Lỗi lấy overall score", {}
+            
+            # Step 2: Lấy detailed scores
+            detailed_scores = self._get_detailed_scores(cv_text, job_text, cv_key_info)
+            
+            # Step 3: Lấy strengths và weaknesses
+            strengths_weaknesses = self._get_strengths_weaknesses(cv_text, job_text, cv_key_info)
+            
+            # Gộp kết quả
+            final_result = {
+                "overall_score": overall_result.get("overall_score", 0),
+                "detailed_scores": detailed_scores,
+                "strengths": strengths_weaknesses.get("strengths", []),
+                "weaknesses": strengths_weaknesses.get("weaknesses", []),
+                "summary": overall_result.get("summary", "")
+            }
+            
+            print(f" CV Agent: Chunked analysis completed successfully")
+            return final_result.get("overall_score", 0), final_result.get("summary", ""), final_result
+            
+        except Exception as e:
+            print(f" CV Agent: Lỗi trong chunked analysis: {e}")
+            return 0, f"Lỗi chunked analysis: {str(e)[:100]}", {}
+
+    def _get_overall_score(self, cv_text: str, job_text: str, cv_key_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Lấy overall score và summary"""
+        try:
+            key_info_str = ""
+            if cv_key_info:
+                key_info_str = f"Kỹ năng: {', '.join(cv_key_info.get('skills', []))}\n"
+                key_info_str += f"Kinh nghiệm: {cv_key_info.get('experience_years', 'Unknown')}\n"
+                key_info_str += f"Học vấn: {', '.join(cv_key_info.get('education', []))}\n"
+            
+            prompt = f"""Bạn là chuyên gia tuyển dụng HR. Đánh giá tổng quan ứng viên này.
+
+{key_info_str}
+
+=== NỘI DUNG CV ===
+{cv_text[:4000]}
+
+=== YÊU CẦU CÔNG VIỆC ===
+{job_text[:1000]}
+
+Chỉ trả về JSON này:
+{{
+    "overall_score": <số nguyên 0-100>,
+    "summary": "<tóm tắt ngắn gọn 50-100 ký tự>"
+}}"""
+            
+            result = self._call_gemini_simple(prompt)
+            return result if result else {}
+            
+        except Exception as e:
+            print(f" CV Agent: Lỗi _get_overall_score: {e}")
+            return {}
+
+    def _get_detailed_scores(self, cv_text: str, job_text: str, cv_key_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Lấy detailed scores cho từng tiêu chí"""
+        try:
+            key_info_str = ""
+            if cv_key_info:
+                key_info_str = f"Kỹ năng: {', '.join(cv_key_info.get('skills', []))}\n"
+                key_info_str += f"Kinh nghiệm: {cv_key_info.get('experience_years', 'Unknown')}\n"
+                key_info_str += f"Học vấn: {', '.join(cv_key_info.get('education', []))}\n"
+            
+            prompt = f"""Bạn là chuyên gia tuyển dụng HR. Đánh giá chi tiết từng tiêu chí.
+
+{key_info_str}
+
+=== NỘI DUNG CV ===
+{cv_text[:4000]}
+
+=== YÊU CẦU CÔNG VIỆC ===
+{job_text[:1000]}
+
+Chỉ trả về JSON này:
+{{
+    "detailed_scores": {{
+        "job_title": {{"score": <số nguyên>, "analysis": "<phân tích ngắn 30-50 ký tự>"}},
+        "skills": {{"score": <số nguyên>, "analysis": "<phân tích ngắn 30-50 ký tự>"}},
+        "experience": {{"score": <số nguyên>, "analysis": "<phân tích ngắn 30-50 ký tự>"}},
+        "education": {{"score": <số nguyên>, "analysis": "<phân tích ngắn 30-50 ký tự>"}}
+    }}
+}}"""
+            
+            result = self._call_gemini_simple(prompt)
+            return result.get("detailed_scores", {}) if result else {}
+            
+        except Exception as e:
+            print(f" CV Agent: Lỗi _get_detailed_scores: {e}")
+            return {}
+
+    def _get_strengths_weaknesses(self, cv_text: str, job_text: str, cv_key_info: Dict[str, Any]) -> Dict[str, Any]:
+        """Lấy strengths và weaknesses"""
+        try:
+            key_info_str = ""
+            if cv_key_info:
+                key_info_str = f"Kỹ năng: {', '.join(cv_key_info.get('skills', []))}\n"
+                key_info_str += f"Kinh nghiệm: {cv_key_info.get('experience_years', 'Unknown')}\n"
+                key_info_str += f"Học vấn: {', '.join(cv_key_info.get('education', []))}\n"
+            
+            prompt = f"""Bạn là chuyên gia tuyển dụng HR. Phân tích điểm mạnh và điểm yếu.
+
+{key_info_str}
+
+=== NỘI DUNG CV ===
+{cv_text[:4000]}
+
+=== YÊU CẦU CÔNG VIỆC ===
+{job_text[:1000]}
+
+Chỉ trả về JSON này:
+{{
+    "strengths": ["<điểm mạnh 1>", "<điểm mạnh 2>"],
+    "weaknesses": ["<điểm yếu 1>", "<điểm yếu 2>"]
+}}"""
+            
+            result = self._call_gemini_simple(prompt)
+            return result if result else {"strengths": [], "weaknesses": []}
+            
+        except Exception as e:
+            print(f" CV Agent: Lỗi _get_strengths_weaknesses: {e}")
+            return {"strengths": [], "weaknesses": []}
+
+    def _call_gemini_simple(self, prompt: str) -> Dict[str, Any]:
+        """Gọi Gemini với prompt đơn giản và trả về JSON"""
+        try:
+            # Check quota
+            quota = self._check_quota()
+            if not quota["available"]:
+                return {}
+            
+            self._increment_quota()
+            
+            # Configure safety settings
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+            
+            model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.3,
+                    max_output_tokens=1000,  # Nhỏ hơn để tránh truncated
+                    top_p=0.8,
+                ),
+                safety_settings=safety_settings
+            )
+            
+            result_text = response.text.strip()
+            print(f" CV Agent: Simple response length: {len(result_text)}")
+            
+            # Clean markdown
+            if "```json" in result_text:
+                result_text = result_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in result_text:
+                result_text = result_text.split("```")[1].split("```")[0].strip()
+            
+            # Parse JSON
+            result = json.loads(result_text)
+            return result
+            
+        except Exception as e:
+            print(f" CV Agent: Lỗi _call_gemini_simple: {e}")
+            return {}
+
     def compare_cv_job_with_gemini(self, cv_text: str, job_text: str, cv_key_info: Optional[Dict] = None) -> tuple:
         """So sánh CV với yêu cầu công việc bằng Gemini AI - phân tích chi tiết từng tiêu chí"""
         
@@ -615,7 +793,8 @@ Chỉ trả về định dạng JSON này:
                 try:
                     print(f" CV Agent: Bắt đầu đánh giá {job_title}...")
                     # Sử dụng Gemini để đánh giá với phân tích chi tiết
-                    score, analysis, detailed_result = self.compare_cv_job_with_gemini(cv_text, job_text, cv_key_info)
+                    # Sử dụng chunked analysis để tránh truncated
+                    score, analysis, detailed_result = self.compare_cv_job_with_gemini_chunked(cv_text, job_text, cv_key_info)
                     print(f" CV Agent: Kết quả đánh giá {job_title}: {score}%")
                     
                     # Kiểm tra rate limit
