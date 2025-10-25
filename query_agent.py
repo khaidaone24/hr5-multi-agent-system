@@ -2,6 +2,7 @@ import asyncio
 import os
 import json
 import re
+import logging
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 try:
@@ -682,7 +683,7 @@ Chỉ trả về phản hồi, không cần giải thích thêm.
                 print(f"🚀 Query Agent - Thực thi SQL: {sql_direct}")
                 table = await self._run_sql(sql_direct)
                 print(f"📊 Query Agent - Kết quả SQL: {table}")
-                final_answer = self._summarize_table(user_input, table)
+                final_answer = await self._summarize_table(user_input, table)
                 return {
                     "agent": "query_agent",
                     "status": "success",
@@ -698,7 +699,7 @@ Chỉ trả về phản hồi, không cần giải thích thêm.
                     print(f"🔄 Query Agent - Sử dụng fallback SQL: {fallback_sql}")
                     table = await self._run_sql(fallback_sql)
                     print(f"📊 Query Agent - Kết quả fallback: {table}")
-                    final_answer = self._summarize_table(user_input, table)
+                    final_answer = await self._summarize_table(user_input, table)
                     return {
                         "agent": "query_agent",
                         "status": "success",
@@ -877,7 +878,7 @@ Chỉ trả về phản hồi, không cần giải thích thêm.
                             sql = self._fallback_sql(user_input)
                         if sql:
                             table = await self._run_sql(sql)
-                    final_answer = self._summarize_table(user_input, table)
+                    final_answer = await self._summarize_table(user_input, table)
                     return {
                         "agent": "query_agent",
                         "status": "success",
@@ -934,7 +935,7 @@ Chỉ trả về phản hồi, không cần giải thích thêm.
                             sql = self._fallback_sql(user_input)
                         if sql:
                             table = await self._run_sql(sql)
-                    final_answer = self._summarize_table(user_input, table)
+                    final_answer = await self._summarize_table(user_input, table)
                     return {
                         "agent": "query_agent",
                         "status": "success", 
