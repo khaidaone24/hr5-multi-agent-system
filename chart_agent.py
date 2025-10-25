@@ -585,8 +585,8 @@ Chọn loại biểu đồ phù hợp nhất với yêu cầu và dữ liệu.
             colors = ['#ff4444', '#44ff44']  # Đỏ cho phù hợp, xanh cho không phù hợp
             explode = (0.05, 0.05)  # Tách nhẹ các phần
             
-            # Tạo figure - nhỏ hơn để vừa trong chat
-            fig, ax = plt.subplots(figsize=(4, 3))
+            # Tạo figure - rất nhỏ để vừa trong chat
+            fig, ax = plt.subplots(figsize=(3, 2.5))
             
             # Tạo donut chart
             wedges, texts, autotexts = ax.pie(
@@ -597,7 +597,7 @@ Chọn loại biểu đồ phù hợp nhất với yêu cầu và dữ liệu.
                 startangle=90,
                 explode=explode,
                 pctdistance=0.85,
-                textprops={'fontsize': 8, 'weight': 'bold'}
+                textprops={'fontsize': 6, 'weight': 'bold'}
             )
             
             # Tạo lỗ ở giữa để tạo donut
@@ -607,10 +607,10 @@ Chọn loại biểu đồ phù hợp nhất với yêu cầu và dữ liệu.
             # Thêm tổng điểm ở giữa
             total_score = suitable_percent
             ax.text(0, 0, f'{total_score}%\nTỔNG ĐIỂM', 
-                   ha='center', va='center', fontsize=9, fontweight='bold')
+                   ha='center', va='center', fontsize=7, fontweight='bold')
             
             # Cấu hình
-            ax.set_title(title, fontsize=10, fontweight='bold', pad=10)
+            ax.set_title(title, fontsize=8, fontweight='bold', pad=5)
             
             # Lưu biểu đồ
             chart_filename = f"donut_chart_{int(suitable_percent)}_{int(unsuitable_percent)}.png"

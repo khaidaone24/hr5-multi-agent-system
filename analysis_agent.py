@@ -164,10 +164,12 @@ class AnalysisAgent:
             chart_agent = ChartAgent()
             logger.info(f"Creating donut chart for score: {score}, cv_name: {cv_name}")
             
+            # Rút ngắn title để tránh chart quá rộng
+            short_title = f"Đánh Giá: {score}%"
             result = chart_agent._create_donut_chart(
                 score, 
                 100 - score, 
-                f"Đánh Giá CV: {cv_name}"
+                short_title
             )
             
             logger.info(f"Donut chart result: {result}")
@@ -245,8 +247,8 @@ class AnalysisAgent:
         
         # Agent Results
         summary_parts.append("### 📊 Kết Quả Chi Tiết")
-        for agent_name, result in agent_results.items():
-            if result:
+            for agent_name, result in agent_results.items():
+                if result:
                 summary_parts.extend(self._format_agent_result(agent_name, result))
         
         return "\n".join(summary_parts)
@@ -384,14 +386,14 @@ class AnalysisAgent:
         
         # Tạo markdown summary đẹp mắt
         markdown_summary = summary_report.get("formatted_summary", "")
-        
-        return {
-            "agent": "analysis_agent",
-            "status": "success",
-            "result": {
+
+            return {
+                "agent": "analysis_agent",
+                "status": "success",
+                "result": {
                 "formatted_summary": markdown_summary,
-                "summary_report": summary_report,
-                "ai_analysis": ai_analysis,
+                    "summary_report": summary_report,
+                    "ai_analysis": ai_analysis,
                 "key_findings": summary_report.get("key_findings", []),
                 "execution_stats": {
                     "total_agents": summary_report["execution_summary"]["total_agents"],
@@ -420,7 +422,7 @@ class AnalysisAgent:
         failed_agents = [r for r in agent_results.values() if r and r.get("status") == "error"]
         
         report = {
-            "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now().isoformat(),
             "user_query": user_input,
             "execution_summary": {
                 "total_agents": len([r for r in agent_results.values() if r is not None]),
