@@ -39,6 +39,11 @@ class OrchestratorAgent:
                 "name": "Analysis Agent",
                 "description": "Tổng hợp kết quả, phân tích tổng thể, đưa ra insights",
                 "capabilities": ["data_synthesis", "insight_generation", "report_creation"]
+            },
+            "conversational_agent": {
+                "name": "Conversational Agent",
+                "description": "Xử lý cuộc trò chuyện chung, chào hỏi, trả lời câu hỏi không liên quan đến chức năng HR cụ thể",
+                "capabilities": ["general_conversation", "greeting", "general_qa", "small_talk"]
             }
         }
 
@@ -116,13 +121,15 @@ Hãy phân tích và trả về JSON với format:
         "needs_analysis": true/false
     }},
     "confidence": 0.0-1.0,
-    "reasoning": "giải thích lý do lựa chọn"
+    "reasoning": "giải thích lý do lựa chọn",
+    "is_conversational": false
 }}
 
 Lưu ý đặc biệt:
 - Nếu yêu cầu tạo chart/biểu đồ mà không có dữ liệu, PHẢI gọi query_agent trước để lấy dữ liệu
 - Có thể gọi nhiều agent theo thứ tự logic
 - Luôn kết thúc bằng analysis_agent để tổng hợp kết quả
+- Nếu yêu cầu chỉ là chào hỏi, trò chuyện chung, hoặc không liên quan đến chức năng HR cụ thể, hãy đặt "is_conversational": true và "required_agents": ["conversational_agent"]
 """
             
             # Gọi LLM để phân tích
@@ -143,7 +150,8 @@ Lưu ý đặc biệt:
                         "execution_plan": [{"step": 1, "agent": "query_agent", "reason": "fallback"}],
                         "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True},
                         "confidence": 0.5,
-                        "reasoning": "LLM response parsing failed, using fallback"
+                        "reasoning": "LLM response parsing failed, using fallback",
+                        "is_conversational": False
                     }
                 
                 print(f" Orchestrator: Execution plan: {result}")
@@ -158,7 +166,8 @@ Lưu ý đặc biệt:
                     "execution_plan": [{"step": 1, "agent": "query_agent", "reason": "fallback due to parsing error"}],
                     "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True},
                     "confidence": 0.3,
-                    "reasoning": f"JSON parsing failed: {e}"
+                    "reasoning": f"JSON parsing failed: {e}",
+                    "is_conversational": False
                 }
                 
         except Exception as e:
@@ -170,7 +179,8 @@ Lưu ý đặc biệt:
                 "execution_plan": [{"step": 1, "agent": "query_agent", "reason": "fallback due to error"}],
                 "special_requirements": {"needs_data": True, "needs_chart": False, "needs_analysis": True},
                 "confidence": 0.1,
-                "reasoning": f"LLM analysis failed: {e}"
+                "reasoning": f"LLM analysis failed: {e}",
+                "is_conversational": False
             }
     
     async def route_to_agents(self, user_input: str, intent_analysis: Dict[str, Any], uploaded_files: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -325,6 +335,18 @@ Lưu ý đặc biệt:
                 print(f" Orchestrator: Analysis Agent result: {result}")
                 return result
                 
+            elif agent_name == "conversational_agent":
+                from conversational_agent import ConversationalAgent
+                agent = ConversationalAgent()
+                # Truyền context nếu có
+                context = {
+                    "intent_analysis": intent_analysis,
+                    "accumulated_results": accumulated_results
+                }
+                result = await agent.process(user_input, context)
+                print(f" Orchestrator: Conversational Agent result: {result}")
+                return result
+                
             else:
                 return {
                     "agent": agent_name,
@@ -350,10 +372,75 @@ Lưu ý đặc biệt:
         intent_analysis = await self.analyze_intent(user_input)
         print(f" Intent Analysis: {intent_analysis}")
         
-        # Bước 2: Điều phối đến nhiều agent theo execution plan
+        # Bước 2: Kiểm tra nếu là conversational intent
+        if intent_analysis.get("is_conversational", False):
+            print(" Orchestrator: Phát hiện conversational intent, gọi Conversational Agent trực tiếp")
+            try:
+                from conversational_agent import ConversationalAgent
+                conversational_agent = ConversationalAgent()
+                context = {
+                    "intent_analysis": intent_analysis,
+                    "uploaded_files": uploaded_files
+                }
+                conversational_result = await conversational_agent.process(user_input, context)
+                
+                # Trả về kết quả conversational trực tiếp
+                return {
+                    "orchestrator": {
+                        "intent_analysis": intent_analysis,
+                        "execution_plan": [{"step": 1, "agent": "conversational_agent", "reason": "conversational intent detected"}],
+                        "timestamp": asyncio.get_event_loop().time()
+                    },
+                    "execution_summary": {
+                        "total_steps": 1,
+                        "successful_steps": 1,
+                        "failed_steps": 0
+                    },
+                    "agent_results": [{
+                        "step": 1,
+                        "agent": "conversational_agent",
+                        "reason": "conversational intent detected",
+                        "status": conversational_result.get("status", "success"),
+                        "result": conversational_result,
+                        "timestamp": asyncio.get_event_loop().time()
+                    }],
+                    "final_status": "success",
+                    "total_agents_executed": 1,
+                    "success_rate": 1.0,
+                    "conversational_response": conversational_result.get("result", {}).get("response", "")
+                }
+            except Exception as e:
+                print(f" Orchestrator: Lỗi gọi Conversational Agent: {e}")
+                # Fallback: trả về response đơn giản
+                return {
+                    "orchestrator": {
+                        "intent_analysis": intent_analysis,
+                        "execution_plan": [{"step": 1, "agent": "conversational_agent", "reason": "conversational intent detected"}],
+                        "timestamp": asyncio.get_event_loop().time()
+                    },
+                    "execution_summary": {
+                        "total_steps": 1,
+                        "successful_steps": 0,
+                        "failed_steps": 1
+                    },
+                    "agent_results": [{
+                        "step": 1,
+                        "agent": "conversational_agent",
+                        "reason": "conversational intent detected",
+                        "status": "error",
+                        "error": str(e),
+                        "timestamp": asyncio.get_event_loop().time()
+                    }],
+                    "final_status": "error",
+                    "total_agents_executed": 1,
+                    "success_rate": 0.0,
+                    "conversational_response": f"Xin lỗi, tôi gặp sự cố kỹ thuật: {e}"
+                }
+        
+        # Bước 3: Điều phối đến nhiều agent theo execution plan (cho non-conversational intents)
         result = await self.route_to_agents(user_input, intent_analysis, uploaded_files)
         
-        # Bước 3: Tổng hợp kết quả cuối cùng
+        # Bước 4: Tổng hợp kết quả cuối cùng
         final_result = {
             "orchestrator": result["orchestrator"],
             "execution_summary": result["execution_summary"],

@@ -422,7 +422,7 @@ class AnalysisAgent:
         failed_agents = [r for r in agent_results.values() if r and r.get("status") == "error"]
         
         report = {
-                "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "user_query": user_input,
             "execution_summary": {
                 "total_agents": len([r for r in agent_results.values() if r is not None]),

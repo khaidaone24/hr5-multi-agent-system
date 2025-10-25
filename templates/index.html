@@ -232,6 +232,7 @@
                 <span class="agent-badge">CV Agent</span>
                 <span class="agent-badge">Chart Agent</span>
                 <span class="agent-badge">Analysis Agent</span>
+                <span class="agent-badge">Conversational Agent</span>
             </div>
             
             <!-- Chat Container -->
@@ -437,6 +438,13 @@
         
         function displayResult(data) {
             let response = '';
+            
+            // Kiểm tra nếu là conversational response
+            if (data.conversational_response) {
+                response = data.conversational_response;
+                addMessage(response, 'agent');
+                return;
+            }
             
             if (data.orchestrator_analysis) {
                 const analysis = data.orchestrator_analysis;

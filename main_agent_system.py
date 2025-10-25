@@ -17,6 +17,7 @@ from query_agent import QueryAgent
 from cv_agent import CVAgent
 from chart_agent import ChartAgent
 from analysis_agent import AnalysisAgent
+from conversational_agent import ConversationalAgent
 
 class MultiAgentSystem:
     """
@@ -32,6 +33,7 @@ class MultiAgentSystem:
         self.cv_agent = CVAgent()
         self.chart_agent = ChartAgent()
         self.analysis_agent = AnalysisAgent()
+        self.conversational_agent = ConversationalAgent()
         
         # Lịch sử conversation
         self.conversation_history = []
@@ -43,6 +45,7 @@ class MultiAgentSystem:
         print("  - CV Agent: Phan tich CV va ung vien")
         print("  - Chart Agent: Tao bieu do va truc quan hoa")
         print("  - Analysis Agent: Tong hop va phan tich ket qua")
+        print("  - Conversational Agent: Tro chuyen chung va chao hoi")
     
     async def process_single_request(self, user_input: str, uploaded_files: List[str] = None) -> Dict[str, Any]:
         """
@@ -67,18 +70,33 @@ class MultiAgentSystem:
             if uploaded_files:
                 orchestrator_result["uploaded_files"] = uploaded_files
             
-            # Bước 2: Luôn gọi Analysis Agent để tạo báo cáo Markdown tổng hợp cho UI
-            try:
-                agent_results_for_analysis = orchestrator_result.get("agent_results", [])
-                analysis_result = await self.analysis_agent.process(user_input, agent_results_for_analysis)
-                orchestrator_result["analysis_result"] = analysis_result
-            except Exception as _e:
-                # Không chặn luồng nếu phân tích lỗi
+            # Bước 2: Kiểm tra nếu là conversational response
+            if orchestrator_result.get("conversational_response"):
+                # Nếu là conversational response, không cần gọi Analysis Agent
                 orchestrator_result["analysis_result"] = {
-                    "agent": "analysis_agent",
-                    "status": "error",
-                    "error": str(_e)
+                    "agent": "conversational_agent",
+                    "status": "success",
+                    "result": {
+                        "formatted_summary": orchestrator_result["conversational_response"],
+                        "summary_report": {
+                            "conversational": True,
+                            "response": orchestrator_result["conversational_response"]
+                        }
+                    }
                 }
+            else:
+                # Bước 2: Luôn gọi Analysis Agent để tạo báo cáo Markdown tổng hợp cho UI
+                try:
+                    agent_results_for_analysis = orchestrator_result.get("agent_results", [])
+                    analysis_result = await self.analysis_agent.process(user_input, agent_results_for_analysis)
+                    orchestrator_result["analysis_result"] = analysis_result
+                except Exception as _e:
+                    # Không chặn luồng nếu phân tích lỗi
+                    orchestrator_result["analysis_result"] = {
+                        "agent": "analysis_agent",
+                        "status": "error",
+                        "error": str(_e)
+                    }
 
             # Lưu vào lịch sử
             self.conversation_history.append({
@@ -192,7 +210,7 @@ class MultiAgentSystem:
                 
                 # Bước 1: CV Agent
                 print(" CV Agent: Phân tích CV...")
-                cv_result = await self.cv_agent.process(user_input, uploaded_files)
+                cv_result = await self.cv_agent.process(user_input, [])
                 
                 # Bước 2: Analysis Agent
                 print(" Analysis Agent: Phân tích tổng hợp...")
@@ -214,7 +232,7 @@ class MultiAgentSystem:
                 print(" Chạy tất cả agents song song...")
                 tasks = [
                     self.query_agent.process(user_input),
-                    self.cv_agent.process(user_input, uploaded_files),
+                    self.cv_agent.process(user_input, []),
                     self.chart_agent.process(user_input)
                 ]
                 
