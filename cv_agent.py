@@ -490,7 +490,10 @@ Return ONLY this JSON format:
                 }
             
             # Phân tích CV được upload
+            print(f" CV Agent: Bắt đầu đánh giá CV...")
             evaluation = await self._evaluate_single_cv(cv_path, job_requirements)
+            print(f" CV Agent: Hoàn thành đánh giá CV")
+            print(f" CV Agent: Evaluation status: {evaluation.get('status')}")
             
             return {
                 "agent": "cv_agent",
@@ -652,6 +655,9 @@ Return ONLY this JSON format:
             
             # Tìm job phù hợp nhất
             best_match = max(evaluations, key=lambda x: x['score'])
+            
+            print(f" CV Agent: Hoàn thành đánh giá {len(evaluations)} jobs")
+            print(f" CV Agent: Best match: {best_match['job_title']} ({best_match['score']}%)")
             
             return {
                 "cv_name": Path(cv_path).name,
