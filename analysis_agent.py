@@ -264,6 +264,9 @@ class AnalysisAgent:
                 key_data["data_summary"] = f"Phân tích {cv_count} CV"
                 key_data["metrics"]["cv_count"] = cv_count
                 
+                # Lưu toàn bộ CV evaluations để hiển thị đầy đủ
+                key_data["full_cv_data"] = result_data.get("cv_evaluations", [])
+                
                 # Tìm CV có điểm cao nhất
                 best_scores = []
                 for evaluation in result_data.get("cv_evaluations", []):
@@ -398,6 +401,36 @@ class AnalysisAgent:
                 if key_data["files_created"]:
                     summary_parts.append(f"- **Files tạo:** {', '.join(key_data['files_created'])}")
                 
+                # Hiển thị full CV data nếu có
+                if agent_name == "cv_agent" and key_data.get("full_cv_data"):
+                    summary_parts.append("")
+                    summary_parts.append("##### 📋 Chi Tiết Đánh Giá CV")
+                    for i, evaluation in enumerate(key_data["full_cv_data"], 1):
+                        cv_name = evaluation.get("cv_name", f"CV_{i}")
+                        status = evaluation.get("status", "Unknown")
+                        
+                        summary_parts.append(f"**{i}. {cv_name}**")
+                        summary_parts.append(f"- **Trạng thái:** {status}")
+                        
+                        if evaluation.get("best_match"):
+                            best_match = evaluation["best_match"]
+                            job_title = best_match.get("job_title", "Unknown")
+                            score = best_match.get("score", 0)
+                            analysis = best_match.get("analysis", "")
+                            
+                            summary_parts.append(f"- **Phù hợp nhất với:** {job_title}")
+                            summary_parts.append(f"- **Điểm số:** {score}%")
+                            summary_parts.append(f"- **Phân tích:** {analysis}")
+                        
+                        if evaluation.get("all_evaluations"):
+                            summary_parts.append("- **Tất cả đánh giá:**")
+                            for eval_item in evaluation["all_evaluations"]:
+                                eval_job = eval_item.get("job_title", "Unknown")
+                                eval_score = eval_item.get("score", 0)
+                                summary_parts.append(f"  - {eval_job}: {eval_score}%")
+                        
+                        summary_parts.append("")
+                
                 summary_parts.append("")
         
         return "\n".join(summary_parts)
@@ -452,23 +485,44 @@ class AnalysisAgent:
                     # Ưu tiên sử dụng final_answer từ QueryAgent
                     if agent_name == "query_agent" and result.get("final_answer"):
                         query_agent_answer = result.get("final_answer")
-                    # Xử lý CV Agent results
+                    # Xử lý CV Agent results - hiển thị đầy đủ
                     elif agent_name == "cv_agent" and result.get("result"):
                         cv_result = result["result"]
                         if isinstance(cv_result, dict) and "cv_evaluations" in cv_result:
                             cv_evaluations = cv_result.get("cv_evaluations", [])
                             cv_summary = []
-                            for evaluation in cv_evaluations:
-                                cv_name = evaluation.get("cv_name", "Unknown")
+                            cv_summary.append(f"📋 **KẾT QUẢ PHÂN TÍCH CV CHI TIẾT**")
+                            cv_summary.append(f"Tổng số CV đã phân tích: {len(cv_evaluations)}")
+                            cv_summary.append("")
+                            
+                            for i, evaluation in enumerate(cv_evaluations, 1):
+                                cv_name = evaluation.get("cv_name", f"CV_{i}")
+                                status = evaluation.get("status", "Unknown")
+                                
+                                cv_summary.append(f"**{i}. {cv_name}**")
+                                cv_summary.append(f"Trạng thái: {status}")
+                                
                                 if evaluation.get("best_match"):
                                     best_match = evaluation["best_match"]
                                     job_title = best_match.get("job_title", "Unknown")
                                     score = best_match.get("score", 0)
                                     analysis = best_match.get("analysis", "")
-                                    cv_summary.append(f"- {cv_name}: Phù hợp nhất với {job_title} ({score}%) - {analysis[:100]}...")
-                                else:
-                                    cv_summary.append(f"- {cv_name}: {evaluation.get('status', 'Unknown')}")
-                            cv_agent_answer = f"Đã phân tích {len(cv_evaluations)} CV:\n" + "\n".join(cv_summary)
+                                    
+                                    cv_summary.append(f"🎯 **Phù hợp nhất với:** {job_title}")
+                                    cv_summary.append(f"⭐ **Điểm số:** {score}%")
+                                    cv_summary.append(f"📝 **Phân tích chi tiết:** {analysis}")
+                                    
+                                    # Hiển thị tất cả đánh giá nếu có
+                                    if evaluation.get("all_evaluations"):
+                                        cv_summary.append("📊 **Tất cả đánh giá:**")
+                                        for eval_item in evaluation["all_evaluations"]:
+                                            eval_job = eval_item.get("job_title", "Unknown")
+                                            eval_score = eval_item.get("score", 0)
+                                            cv_summary.append(f"  - {eval_job}: {eval_score}%")
+                                
+                                cv_summary.append("")
+                            
+                            cv_agent_answer = "\n".join(cv_summary)
             
             # Thêm thông tin về dữ liệu bảng nếu có
             table_summary = ""
@@ -494,12 +548,13 @@ Dữ liệu chính được truy vấn (nếu có):
 
 HƯỚNG DẪN TRẢ LỜI:
 1. ƯU TIÊN sử dụng kết quả từ QueryAgent nếu có
-2. Nếu có CV Agent results, hiển thị chi tiết đánh giá CV
+2. Nếu có CV Agent results, HIỂN THỊ ĐẦY ĐỦ tất cả thông tin CV (KHÔNG tóm tắt)
 3. Trả lời TRỰC TIẾP câu hỏi của người dùng
 4. Sử dụng dữ liệu cụ thể từ kết quả
 5. Trả lời tự nhiên như đang nói chuyện
 6. Nếu có dữ liệu bảng, nêu các điểm chính
 7. Thêm insights ngắn gọn nếu hữu ích
+8. VỚI CV RESULTS: Hiển thị từng CV với đầy đủ thông tin đánh giá
 
 VÍ DỤ:
 - Người dùng hỏi: "Có bao nhiêu nhân viên?"
