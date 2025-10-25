@@ -302,7 +302,7 @@ class AnalysisAgent:
         if result.get("status") != "success":
             return key_data
         
-        agent_name = result.get("agent", "unknown")
+            agent_name = result.get("agent", "unknown")
         result_data = result.get("result", {})
         
         if agent_name == "cv_agent":
@@ -315,7 +315,7 @@ class AnalysisAgent:
                 "successful_analysis": len([e for e in cv_evaluations if e.get("status") == "success"])
             }
         
-        elif agent_name == "chart_agent":
+            elif agent_name == "chart_agent":
             key_data["data_type"] = "chart_creation"
             key_data["data_summary"] = result_data.get("summary", "Tạo biểu đồ")
             key_data["files_created"] = result_data.get("files_created", [])
@@ -350,6 +350,124 @@ class AnalysisAgent:
         
         return findings
     
+    def _generate_query_analysis(self, agent_results_dict: Dict[str, Any]) -> str:
+        """Tạo phân tích thân thiện cho query results"""
+        query_result = agent_results_dict.get("query_agent")
+        if not query_result or query_result.get("status") != "success":
+            return ""
+        
+        result_data = query_result.get("result", {})
+        if not result_data:
+            return ""
+        
+        # Lấy dữ liệu từ query result
+        columns = result_data.get("columns", [])
+        data = result_data.get("data", [])
+        
+        if not data or not columns:
+            return ""
+        
+        # Xử lý dữ liệu phòng ban
+        if "phong_ban" in str(result_data.get("raw_result", "")).lower():
+            return self._format_phong_ban_analysis(data)
+        
+        # Xử lý dữ liệu nhân viên
+        elif "nhan_vien" in str(result_data.get("raw_result", "")).lower():
+            return self._format_nhan_vien_analysis(data)
+        
+        # Xử lý dữ liệu chung
+        else:
+            return self._format_general_analysis(columns, data)
+    
+    def _format_phong_ban_analysis(self, data: List[List]) -> str:
+        """Format phân tích phòng ban"""
+        if not data or not data[0]:
+            return ""
+        
+        try:
+            # Parse dữ liệu phòng ban từ string
+            import ast
+            phong_ban_data = ast.literal_eval(data[0][0])
+            
+            if not isinstance(phong_ban_data, list):
+                return ""
+            
+            analysis = "### 🏢 Danh Sách Phòng Ban\n\n"
+            
+            for pb in phong_ban_data:
+                if isinstance(pb, dict):
+                    ten_pb = pb.get("ten_phong_ban", "N/A")
+                    ma_pb = pb.get("ma_phong_ban", "N/A")
+                    mo_ta = pb.get("mo_ta", "Không có mô tả")
+                    ngay_tl = pb.get("ngay_thanh_lap", "N/A")
+                    trang_thai = pb.get("trang_thai", "N/A")
+                    
+                    analysis += f"**{ten_pb}** ({ma_pb})\n"
+                    analysis += f"- 📝 Mô tả: {mo_ta}\n"
+                    analysis += f"- 📅 Ngày thành lập: {ngay_tl}\n"
+                    analysis += f"- ✅ Trạng thái: {trang_thai}\n\n"
+            
+            analysis += f"**📊 Tổng kết:** Có {len(phong_ban_data)} phòng ban đang hoạt động trong hệ thống."
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"Error formatting phong ban analysis: {e}")
+            return f"### 🏢 Danh Sách Phòng Ban\n\nĐã truy vấn thành công dữ liệu phòng ban. Có {len(data)} bản ghi được trả về."
+    
+    def _format_nhan_vien_analysis(self, data: List[List]) -> str:
+        """Format phân tích nhân viên"""
+        if not data or not data[0]:
+            return ""
+        
+        try:
+            import ast
+            nhan_vien_data = ast.literal_eval(data[0][0])
+            
+            if not isinstance(nhan_vien_data, list):
+                return ""
+            
+            analysis = "### 👥 Danh Sách Nhân Viên\n\n"
+            
+            for nv in nhan_vien_data[:10]:  # Chỉ hiển thị 10 nhân viên đầu
+                if isinstance(nv, dict):
+                    ho_ten = nv.get("ho_ten", "N/A")
+                    ma_nv = nv.get("ma_nhan_vien", "N/A")
+                    email = nv.get("email", "N/A")
+                    trang_thai = nv.get("trang_thai", "N/A")
+                    
+                    analysis += f"**{ho_ten}** ({ma_nv})\n"
+                    analysis += f"- 📧 Email: {email}\n"
+                    analysis += f"- ✅ Trạng thái: {trang_thai}\n\n"
+            
+            if len(nhan_vien_data) > 10:
+                analysis += f"... và {len(nhan_vien_data) - 10} nhân viên khác\n\n"
+            
+            analysis += f"**📊 Tổng kết:** Có {len(nhan_vien_data)} nhân viên trong hệ thống."
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"Error formatting nhan vien analysis: {e}")
+            return f"### 👥 Danh Sách Nhân Viên\n\nĐã truy vấn thành công dữ liệu nhân viên. Có {len(data)} bản ghi được trả về."
+    
+    def _format_general_analysis(self, columns: List[str], data: List[List]) -> str:
+        """Format phân tích dữ liệu chung"""
+        if not data:
+            return ""
+        
+        analysis = "### 📊 Kết Quả Truy Vấn\n\n"
+        analysis += f"**Các cột dữ liệu:** {', '.join(columns)}\n\n"
+        analysis += f"**Số bản ghi:** {len(data)}\n\n"
+        
+        if data and len(data[0]) > 0:
+            analysis += "**Dữ liệu mẫu:**\n"
+            for i, row in enumerate(data[:5]):  # Hiển thị 5 dòng đầu
+                analysis += f"{i+1}. {row[0] if row else 'N/A'}\n"
+            
+            if len(data) > 5:
+                analysis += f"... và {len(data) - 5} bản ghi khác\n"
+        
+        return analysis
+    
     def _summarize_agent_result(self, result: Dict[str, Any]) -> str:
         """Tóm tắt kết quả agent"""
         if result.get("status") == "success":
@@ -381,14 +499,18 @@ class AnalysisAgent:
         # Create summary report
         summary_report = self._create_summary_report(agent_results_dict, user_input)
         
-        # Bypass AI analysis để tiết kiệm token
-        ai_analysis = ""
+        # Tạo AI analysis cho query results
+        ai_analysis = self._generate_query_analysis(agent_results_dict)
         
         # Tạo markdown summary đẹp mắt
         markdown_summary = summary_report.get("formatted_summary", "")
-
-        return {
-            "agent": "analysis_agent",
+        
+        # Thêm AI analysis vào markdown nếu có
+        if ai_analysis:
+            markdown_summary += "\n\n" + ai_analysis
+            
+            return {
+                "agent": "analysis_agent",
             "status": "success",
             "result": {
                 "formatted_summary": markdown_summary,
