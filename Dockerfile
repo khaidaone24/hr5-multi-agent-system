@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.cargo/bin:$PATH"
 
+# Install postgres-mcp using uv
+RUN uv tool install postgres-mcp
+
 # Copy requirements first for better caching
 COPY requirements.txt .
 

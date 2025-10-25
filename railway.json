@@ -15,7 +15,8 @@
     "production": {
       "variables": {
         "FLASK_ENV": "production",
-        "PYTHONPATH": "/app"
+        "PYTHONPATH": "/app",
+        "RAILWAY_ENVIRONMENT": "production"
       }
     }
   }
