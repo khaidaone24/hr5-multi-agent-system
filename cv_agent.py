@@ -348,8 +348,25 @@ Return ONLY this JSON format:
             # Đọc job requirements
             job_requirements = self._load_job_requirements()
             
+            # Tạo đường dẫn đầy đủ cho file upload
+            if not uploaded_file.startswith('/') and not uploaded_file.startswith('uploads/'):
+                cv_path = f"uploads/{uploaded_file}"
+            else:
+                cv_path = uploaded_file
+            
+            print(f" CV Agent: Đường dẫn CV: {cv_path}")
+            
+            # Kiểm tra file có tồn tại không
+            if not Path(cv_path).exists():
+                return {
+                    "agent": "cv_agent",
+                    "status": "error",
+                    "error": f"File không tồn tại: {cv_path}",
+                    "error_type": "FileNotFoundError"
+                }
+            
             # Phân tích CV được upload
-            evaluation = await self._evaluate_single_cv(uploaded_file, job_requirements)
+            evaluation = await self._evaluate_single_cv(cv_path, job_requirements)
             
             return {
                 "agent": "cv_agent",
@@ -402,9 +419,15 @@ Return ONLY this JSON format:
     async def _evaluate_single_cv(self, cv_path: str, job_requirements: Dict[str, Any]) -> Dict[str, Any]:
         """Đánh giá một CV cụ thể"""
         try:
+            print(f" CV Agent: Đang đánh giá CV: {cv_path}")
+            print(f" CV Agent: Job requirements có {len(job_requirements)} jobs")
+            
             # Extract CV content
             cv_data = self.extract_pdf_with_content(cv_path)
+            print(f" CV Agent: CV data extracted: {bool(cv_data)}")
+            
             if not cv_data or not cv_data.get('text'):
+                print(f" CV Agent: Không thể đọc nội dung CV từ {cv_path}")
                 return {
                     "cv_name": Path(cv_path).name,
                     "status": "error",
@@ -417,6 +440,7 @@ Return ONLY this JSON format:
             # So sánh với từng job requirement
             evaluations = []
             for job_title, job_req in job_requirements.items():
+                print(f" CV Agent: Đang so sánh với job: {job_title}")
                 job_text = f"""
                 Job Title: {job_title}
                 Skills Required: {job_req.get('skills_required', '')}
@@ -426,15 +450,25 @@ Return ONLY this JSON format:
                 Preferred Keywords: {job_req.get('preferred_keywords', '')}
                 """
                 
-                # Sử dụng Gemini để đánh giá
-                score, analysis = self.compare_cv_job_with_gemini(cv_text, job_text, cv_key_info)
-                
-                evaluations.append({
-                    "job_title": job_title,
-                    "score": score,
-                    "analysis": analysis,
-                    "cv_key_info": cv_key_info
-                })
+                try:
+                    # Sử dụng Gemini để đánh giá
+                    score, analysis = self.compare_cv_job_with_gemini(cv_text, job_text, cv_key_info)
+                    print(f" CV Agent: Kết quả đánh giá {job_title}: {score}%")
+                    
+                    evaluations.append({
+                        "job_title": job_title,
+                        "score": score,
+                        "analysis": analysis,
+                        "cv_key_info": cv_key_info
+                    })
+                except Exception as e:
+                    print(f" CV Agent: Lỗi đánh giá {job_title}: {e}")
+                    evaluations.append({
+                        "job_title": job_title,
+                        "score": 0,
+                        "analysis": f"Lỗi đánh giá: {str(e)}",
+                        "cv_key_info": cv_key_info
+                    })
             
             # Tìm job phù hợp nhất
             best_match = max(evaluations, key=lambda x: x['score'])
