@@ -1017,38 +1017,19 @@ Yêu cầu định dạng câu trả lời:
             # Tạo báo cáo tổng hợp với format đẹp
             summary_report = self._create_summary_report(extracted_results, user_input)
             
-            # Tạo AI analysis nếu có dữ liệu
+            # Bỏ qua AI analysis để tiết kiệm token - chỉ trả về markdown format
             ai_analysis = ""
-            if self.ai_enabled:
-                # Tìm dữ liệu bảng để phân tích
-                first_table = None
-                for r in agent_results:
-                    if not r:
-                        continue
-                    res = r.get("result")
-                    if isinstance(res, dict) and res.get("columns") and res.get("data"):
-                        first_table = res
-                        break
-                    elif isinstance(res, list) and res and all(isinstance(x, dict) for x in res):
-                        converted = self._list_of_dicts_to_table(res)
-                        if converted and converted.get("data"):
-                            first_table = converted
-                            break
-                
-                ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
-
-            # Tạo markdown summary đẹp mắt
+            
+            # Tạo markdown summary đẹp mắt (đã có đầy đủ thông tin)
             markdown_summary = summary_report.get("formatted_summary", "")
-            if ai_analysis:
-                markdown_summary += f"\n\n### 🤖 Phân Tích AI\n{ai_analysis}"
 
             return {
                 "agent": "analysis_agent",
                 "status": "success",
                 "result": {
-                    "formatted_summary": markdown_summary,
+                    "formatted_summary": markdown_summary,  # Ưu tiên markdown format
                     "summary_report": summary_report,
-                    "ai_analysis": ai_analysis,
+                    "ai_analysis": ai_analysis,  # Bỏ trống để tiết kiệm token
                     "key_findings": summary_report.get("key_findings", []),
                     "execution_stats": {
                         "total_agents": summary_report["execution_summary"]["total_agents"],
