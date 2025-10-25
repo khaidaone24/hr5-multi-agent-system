@@ -107,6 +107,10 @@ Các agent có sẵn:
 
 Yêu cầu của người dùng: "{user_input}"
 
+QUAN TRỌNG - Phân biệt rõ ràng:
+1. **CÂU HỎI VỀ CÁCH THỨC** (như "phân tích CV như thế nào", "làm sao để...", "cách thức...") → Gọi conversational_agent
+2. **YÊU CẦU THỰC HIỆN HÀNH ĐỘNG** (như "quét CV này", "tạo biểu đồ", "tìm nhân viên") → Gọi agent chuyên biệt
+
 Hãy phân tích và trả về JSON với format:
 {{
     "primary_intent": "mô tả intent chính",
@@ -126,9 +130,11 @@ Hãy phân tích và trả về JSON với format:
 }}
 
 Lưu ý đặc biệt:
+- Nếu yêu cầu là CÂU HỎI VỀ CÁCH THỨC, đặt "is_conversational": true và "required_agents": ["conversational_agent"]
+- Nếu yêu cầu là YÊU CẦU THỰC HIỆN HÀNH ĐỘNG, gọi agent chuyên biệt tương ứng
 - Nếu yêu cầu tạo chart/biểu đồ mà không có dữ liệu, PHẢI gọi query_agent trước để lấy dữ liệu
 - Có thể gọi nhiều agent theo thứ tự logic
-- Luôn kết thúc bằng analysis_agent để tổng hợp kết quả
+- Luôn kết thúc bằng analysis_agent để tổng hợp kết quả (trừ conversational)
 - Nếu yêu cầu chỉ là chào hỏi, trò chuyện chung, hoặc không liên quan đến chức năng HR cụ thể, hãy đặt "is_conversational": true và "required_agents": ["conversational_agent"]
 """
             
