@@ -67,12 +67,19 @@ class CVAgent:
     
     def extract_pdf_with_content(self, pdf_path: str) -> Dict[str, Any]:
         """Trích xuất nội dung PDF với cấu trúc"""
+        print(f" CV Agent: Extracting PDF from: {pdf_path}")
         if not os.path.exists(pdf_path):
+            print(f" CV Agent: PDF file not found: {pdf_path}")
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
         
-        doc = fitz.open(pdf_path)
-        pdf_data = {"headings": {}, "all_text": "", "structured_data": {}}
-        current_heading = None
+        try:
+            doc = fitz.open(pdf_path)
+            print(f" CV Agent: PDF opened successfully, {len(doc)} pages")
+            pdf_data = {"headings": {}, "all_text": "", "structured_data": {}}
+            current_heading = None
+        except Exception as e:
+            print(f" CV Agent: Error opening PDF: {e}")
+            raise
         
         for page_num, page in enumerate(doc, start=1):
             blocks = page.get_text("dict")["blocks"]
@@ -109,6 +116,8 @@ class CVAgent:
                         if current_heading:
                             pdf_data["headings"][current_heading]["content"] += line_text + "\n"
         
+        print(f" CV Agent: PDF extraction completed. Text length: {len(pdf_data['all_text'])}")
+        print(f" CV Agent: Text preview: {pdf_data['all_text'][:200]}...")
         return pdf_data
     
     def extract_key_info(self, cv_text: str) -> Dict[str, Any]:
@@ -425,16 +434,19 @@ Return ONLY this JSON format:
             # Extract CV content
             cv_data = self.extract_pdf_with_content(cv_path)
             print(f" CV Agent: CV data extracted: {bool(cv_data)}")
+            print(f" CV Agent: CV data keys: {list(cv_data.keys()) if cv_data else 'None'}")
+            print(f" CV Agent: All text length: {len(cv_data.get('all_text', '')) if cv_data else 0}")
             
-            if not cv_data or not cv_data.get('text'):
+            if not cv_data or not cv_data.get('all_text'):
                 print(f" CV Agent: Không thể đọc nội dung CV từ {cv_path}")
+                print(f" CV Agent: CV data: {cv_data}")
                 return {
                     "cv_name": Path(cv_path).name,
                     "status": "error",
                     "error": "Không thể đọc nội dung CV"
                 }
             
-            cv_text = cv_data['text']
+            cv_text = cv_data['all_text']
             cv_key_info = self.extract_key_info(cv_text)
             
             # So sánh với từng job requirement
