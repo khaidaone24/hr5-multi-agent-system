@@ -179,24 +179,70 @@ class QueryAgent:
     async def initialize(self):
         """Khởi tạo MCP Client và Agent"""
         if self.client is None:
-            print("🚀 Query Agent: Đang khởi tạo MCP Client...")
-            self.client = MCPClient.from_dict(self.config)
-            await self.client.create_all_sessions()
-            print("✅ Query Agent: MCP Client đã kết nối!")
-            
-            # Đợi MCP Server load schema
-            await asyncio.sleep(3)
-            
-            # Khởi tạo LLM
-            self.llm = ChatGoogleGenerativeAI(
-                model="models/gemini-2.5-flash-lite",
-                google_api_key=self.GEMINI_API_KEY,
-                temperature=0.2,
-            )
-            
-            # Tạo MCP Agent
-            self.agent = MCPAgent(llm=self.llm, client=self.client, max_steps=20)
-            print("🤖 Query Agent: Sẵn sàng xử lý truy vấn!")
+            try:
+                print("🚀 Query Agent: Đang khởi tạo MCP Client...")
+                
+                # Kiểm tra MCPClient có method from_dict không
+                if hasattr(MCPClient, 'from_dict'):
+                    print("✅ Query Agent: Sử dụng MCPClient.from_dict")
+                    self.client = MCPClient.from_dict(self.config)
+                else:
+                    # Fallback: tạo client trực tiếp
+                    print("⚠️ Query Agent: MCPClient.from_dict không khả dụng, sử dụng fallback")
+                    try:
+                        # Thử tạo client với config trực tiếp
+                        self.client = MCPClient()
+                        # Set config manually nếu có method
+                        if hasattr(self.client, 'configure'):
+                            self.client.configure(self.config)
+                    except Exception as e:
+                        print(f"⚠️ Query Agent: Không thể tạo MCPClient: {e}")
+                        raise e
+                
+                try:
+                    await self.client.create_all_sessions()
+                    print("✅ Query Agent: MCP Client đã kết nối!")
+                except Exception as session_error:
+                    print(f"⚠️ Query Agent: Lỗi tạo sessions: {session_error}")
+                    # Thử tạo session riêng lẻ
+                    try:
+                        await self.client.create_session("postgres")
+                        print("✅ Query Agent: PostgreSQL session đã tạo!")
+                    except Exception as postgres_error:
+                        print(f"⚠️ Query Agent: Không thể tạo PostgreSQL session: {postgres_error}")
+                        raise postgres_error
+                
+                # Đợi MCP Server load schema
+                await asyncio.sleep(3)
+                
+                # Khởi tạo LLM
+                self.llm = ChatGoogleGenerativeAI(
+                    model="models/gemini-2.5-flash-lite",
+                    google_api_key=self.GEMINI_API_KEY,
+                    temperature=0.2,
+                )
+                
+                # Tạo MCP Agent
+                try:
+                    self.agent = MCPAgent(llm=self.llm, client=self.client, max_steps=20)
+                    print("🤖 Query Agent: Sẵn sàng xử lý truy vấn!")
+                except Exception as agent_error:
+                    print(f"⚠️ Query Agent: Lỗi tạo MCPAgent: {agent_error}")
+                    # Agent có thể không cần thiết nếu có LLM và client
+                    self.agent = None
+                    print("⚠️ Query Agent: Chạy ở chế độ không có MCPAgent")
+                
+            except Exception as e:
+                print(f"⚠️ Query Agent: Lỗi khởi tạo MCP Client: {e}")
+                print("⚠️ Query Agent: Chuyển sang mock mode")
+                # Khởi tạo LLM cho mock mode
+                self.llm = ChatGoogleGenerativeAI(
+                    model="models/gemini-2.5-flash-lite",
+                    google_api_key=self.GEMINI_API_KEY,
+                    temperature=0.2,
+                )
+                self.client = None
+                self.agent = None
     
     async def get_schema_info(self):
         """Lấy thông tin schema để agent hiểu cấu trúc database"""
@@ -273,8 +319,17 @@ class QueryAgent:
                     "raw_result": sql_direct
                 }
 
-            # Fallback: dùng toolflow của MCP agent
-            result = await self.agent.run(hint + user_input)
+            # Fallback: dùng toolflow của MCP agent (nếu có)
+            if self.agent:
+                result = await self.agent.run(hint + user_input)
+            else:
+                # Nếu không có agent, trả về error
+                return {
+                    "agent": "query_agent",
+                    "status": "error",
+                    "error": "MCP Agent not available - database connection failed",
+                    "result": {"columns": ["error"], "data": [["Database not available"]]}
+                }
 
             # ÉP LUÔN trả về kết quả có cấu trúc {columns, data}
             def safe(val):
