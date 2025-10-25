@@ -75,9 +75,26 @@ class QueryAgent:
             
             # Parse kết quả từ database
             try:
-                # Thử parse JSON trước
+                # Clean up response trước khi parse JSON
                 import json
-                obj = json.loads(txt)
+                import re
+                
+                # Fix common JSON issues
+                cleaned_txt = txt
+                # Replace NaN with null
+                cleaned_txt = re.sub(r'\bNaN\b', 'null', cleaned_txt)
+                # Replace Infinity with null
+                cleaned_txt = re.sub(r'\bInfinity\b', 'null', cleaned_txt)
+                # Replace -Infinity with null
+                cleaned_txt = re.sub(r'\b-Infinity\b', 'null', cleaned_txt)
+                # Fix Decimal objects
+                cleaned_txt = re.sub(r"Decimal\('([^']+)'\)", r'\1', cleaned_txt)
+                # Fix single quotes to double quotes for JSON
+                cleaned_txt = cleaned_txt.replace("'", '"')
+                
+                print(f"🔧 Query Agent - Cleaned response: {cleaned_txt[:200]}...")
+                
+                obj = json.loads(cleaned_txt)
                 if isinstance(obj, list):
                     if obj:  # Có dữ liệu
                         # Lấy columns từ key đầu tiên
