@@ -1,0 +1,45 @@
+# Multi-Agent HR System Requirements
+
+# Environment and configuration
+python-dotenv>=1.0.0
+
+# AI and LLM
+langchain-google-genai>=0.0.8
+google-generativeai>=0.3.0
+
+# MCP (Model Context Protocol) - Note: This might need to be installed from source
+# mcp>=0.1.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# PDF processing
+PyMuPDF>=1.23.0
+
+# Excel processing
+openpyxl>=3.1.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Database
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+
+# HTTP and API
+requests>=2.31.0
+aiohttp>=3.8.0
+
+# Utilities
+pydantic>=2.0.0
+click>=8.1.0
+
+# Additional dependencies that might be needed
+crewai>=0.1.0
+langchain>=0.1.0
+
+# Web interface
+flask>=2.3.0
+werkzeug>=2.3.0

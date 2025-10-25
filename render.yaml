@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: hr5-multi-agent-system
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /api/status
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 5000
