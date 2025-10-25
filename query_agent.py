@@ -53,6 +53,9 @@ class QueryAgent:
             }
         }
         
+        # Initialize schema-related attributes
+        self.schema_details = {}
+        self.schema_info = ""
         self.client = None
         self.agent = None
         self.llm = None
