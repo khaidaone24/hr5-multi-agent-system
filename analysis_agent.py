@@ -425,7 +425,7 @@ class AnalysisAgent:
                                 summary_parts.append("⏰ **Thời gian:** " + datetime.now().strftime('%H:%M:%S'))
                                 summary_parts.append("🛑 **Hệ thống đã dừng phân tích để tránh lỗi API**")
                                 summary_parts.append("💡 **Giải pháp:** Vui lòng thử lại sau 1-2 phút")
-                                summary_parts.append("🤖 **Model:** Gemini 2.0 Flash Exp")
+                                summary_parts.append("🤖 **Model:** Gemini 2.5 Flash Lite")
                                 summary_parts.append("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
                                 summary_parts.append("")
                                 return "\n".join(summary_parts)

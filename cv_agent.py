@@ -31,9 +31,9 @@ class CVAgent:
         genai.configure(api_key=self.GEMINI_API_KEY)
         
         # LLM cho agent
-        self.model_name = "models/gemini-2.0-flash-exp"  # Model chính cho CV analysis
+        self.model_name = "models/gemini-2.5-flash-lite"  # Model chính cho CV analysis
         self.llm = ChatGoogleGenerativeAI(
-            model="models/gemini-2.0-flash-lite",
+            model="models/gemini-2.5-flash-lite",
             google_api_key=self.GEMINI_API_KEY,
             temperature=0.2,
         )
@@ -263,7 +263,7 @@ Return ONLY this JSON format:
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
             ]
             
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            model = genai.GenerativeModel('gemini-2.5-flash-lite')
             response = model.generate_content(
                 prompt,
                 generation_config=genai.GenerationConfig(
