@@ -416,12 +416,63 @@ Chỉ trả về markdown, không cần giải thích thêm.
 """
             
             response = await llm.ainvoke(prompt)
-            return response.content if hasattr(response, 'content') else str(response)
+            llm_analysis = response.content if hasattr(response, 'content') else str(response)
+            
+            # Thêm HTML table vào cuối phân tích
+            html_table = self._create_html_table(columns, data)
+            
+            return llm_analysis + "\n\n" + html_table
             
         except Exception as e:
             logger.error(f"Error generating LLM query analysis: {e}")
-            return f"### Kết Quả Truy Vấn\n\nĐã truy vấn thành công. Có {len(data)} bản ghi được trả về."
-    
+            # Fallback: chỉ hiển thị HTML table
+            html_table = self._create_html_table(columns, data)
+            return f"### Kết Quả Truy Vấn\n\nĐã truy vấn thành công. Có {len(data)} bản ghi được trả về.\n\n" + html_table
+
+    def _create_html_table(self, columns: list, data: list) -> str:
+        """Tạo bảng HTML đẹp mắt từ dữ liệu"""
+        if not columns or not data:
+            return ""
+        
+        # Tạo header
+        html = '<div class="table-responsive mt-3">\n'
+        html += '<table class="table table-striped table-hover table-bordered">\n'
+        html += '<thead class="table-dark">\n<tr>\n'
+        
+        # Thêm các cột header
+        for col in columns:
+            html += f'<th scope="col">{col}</th>\n'
+        html += '</tr>\n</thead>\n'
+        
+        # Thêm dữ liệu
+        html += '<tbody>\n'
+        for row in data:
+            html += '<tr>\n'
+            for cell in row:
+                # Format cell value
+                if cell is None:
+                    cell_value = '-'
+                elif isinstance(cell, (int, float)):
+                    # Format số tiền
+                    if 'luong' in str(cell).lower() or 'salary' in str(cell).lower():
+                        cell_value = f"{cell:,.0f} VNĐ"
+                    else:
+                        cell_value = f"{cell:,}"
+                elif hasattr(cell, 'strftime'):  # datetime object
+                    cell_value = cell.strftime('%d/%m/%Y')
+                else:
+                    cell_value = str(cell)
+                
+                html += f'<td>{cell_value}</td>\n'
+            html += '</tr>\n'
+        html += '</tbody>\n'
+        html += '</table>\n'
+        html += '</div>\n'
+        
+        # Thêm thông tin tổng số bản ghi
+        html += f'<div class="text-muted mt-2"><small>Tổng số bản ghi: {len(data)}</small></div>\n'
+        
+        return html
     
     def _summarize_agent_result(self, result: Dict[str, Any]) -> str:
         """Tóm tắt kết quả agent"""
