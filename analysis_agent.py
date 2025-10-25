@@ -123,6 +123,9 @@ class AnalysisAgent:
                 lines.append("- **Cần cải thiện:**")
                 lines.extend([f"  - {w}" for w in eval_item["weaknesses"]])
             
+            # Thêm donut chart cho từng vị trí
+            lines.extend(self._create_donut_chart_section(score, f"{job} - {cv_name}"))
+            
             lines.append("\n---\n")
         
         return lines
