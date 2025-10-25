@@ -439,12 +439,63 @@ Chỉ trả về phản hồi, không cần giải thích thêm.
             if not cols or not data:
                 return ""
             
+            # Tạo bảng HTML đẹp mắt
+            html_table = self._create_html_table(cols, data)
+            
             # Sử dụng LLM để tạo phản hồi thân thiện
-            return await self._generate_llm_summary(question, table)
+            llm_summary = await self._generate_llm_summary(question, table)
+            
+            # Kết hợp LLM summary với bảng HTML
+            return llm_summary + "\n\n" + html_table
             
         except Exception as e:
             logging.error(f"Error in _summarize_table: {e}")
             return f"Đã truy vấn thành công. Có {len(data)} bản ghi được trả về."
+
+    def _create_html_table(self, columns: list, data: list) -> str:
+        """Tạo bảng HTML đẹp mắt từ dữ liệu"""
+        if not columns or not data:
+            return ""
+        
+        # Tạo header
+        html = '<div class="table-responsive mt-3">\n'
+        html += '<table class="table table-striped table-hover table-bordered">\n'
+        html += '<thead class="table-dark">\n<tr>\n'
+        
+        # Thêm các cột header
+        for col in columns:
+            html += f'<th scope="col">{col}</th>\n'
+        html += '</tr>\n</thead>\n'
+        
+        # Thêm dữ liệu
+        html += '<tbody>\n'
+        for row in data:
+            html += '<tr>\n'
+            for cell in row:
+                # Format cell value
+                if cell is None:
+                    cell_value = '-'
+                elif isinstance(cell, (int, float)):
+                    # Format số tiền
+                    if 'luong' in str(cell).lower() or 'salary' in str(cell).lower():
+                        cell_value = f"{cell:,.0f} VNĐ"
+                    else:
+                        cell_value = f"{cell:,}"
+                elif hasattr(cell, 'strftime'):  # datetime object
+                    cell_value = cell.strftime('%d/%m/%Y')
+                else:
+                    cell_value = str(cell)
+                
+                html += f'<td>{cell_value}</td>\n'
+            html += '</tr>\n'
+        html += '</tbody>\n'
+        html += '</table>\n'
+        html += '</div>\n'
+        
+        # Thêm thông tin tổng số bản ghi
+        html += f'<div class="text-muted mt-2"><small>Tổng số bản ghi: {len(data)}</small></div>\n'
+        
+        return html
 
     async def _load_schema_details(self):
         """Lấy thông tin chi tiết các bảng quan trọng"""
