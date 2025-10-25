@@ -203,7 +203,7 @@ Lưu ý đặc biệt:
             agent_name = step_info.get("agent", "")
             reason = step_info.get("reason", "")
             
-            print(f"🔄 Step {step_num}: Executing {agent_name} - {reason}")
+            print(f"Step {step_num}: Executing {agent_name} - {reason}")
             
             try:
                 # Import và gọi agent tương ứng
@@ -257,8 +257,8 @@ Lưu ý đặc biệt:
                 return await agent.process(prepared)
                 
             elif agent_name == "cv_agent":
-                from cv_agent_enhanced import EnhancedCVAgent
-                agent = EnhancedCVAgent()
+                from cv_agent import CVAgent
+                agent = CVAgent()
                 # Truyền uploaded_files nếu có
                 uploaded_files = accumulated_data.get("uploaded_files", []) if accumulated_data else []
                 return await agent.process(user_input, uploaded_files)
