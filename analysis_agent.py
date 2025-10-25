@@ -414,6 +414,22 @@ class AnalysisAgent:
                         # Thông tin ứng viên
                         summary_parts.append(f"**👤 Thông tin ứng viên: {cv_name}**")
                         summary_parts.append(f"- **Trạng thái:** {status}")
+                        
+                        # Kiểm tra lỗi 429
+                        if status == "error" and evaluation.get("error"):
+                            error_msg = evaluation.get("error", "")
+                            if "429" in error_msg or "Rate limit" in error_msg:
+                                summary_parts.append("")
+                                summary_parts.append("🚨🚨🚨 **LỖI RATE LIMIT 429** 🚨🚨🚨")
+                                summary_parts.append(f"❌ **Lỗi:** {error_msg}")
+                                summary_parts.append("⏰ **Thời gian:** " + datetime.now().strftime('%H:%M:%S'))
+                                summary_parts.append("🛑 **Hệ thống đã dừng phân tích để tránh lỗi API**")
+                                summary_parts.append("💡 **Giải pháp:** Vui lòng thử lại sau 1-2 phút")
+                                summary_parts.append("🤖 **Model:** Gemini 2.0 Flash Exp")
+                                summary_parts.append("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+                                summary_parts.append("")
+                                return "\n".join(summary_parts)
+                        
                         if cv_key_info.get("experience_years"):
                             summary_parts.append(f"- **Kinh nghiệm:** {cv_key_info.get('experience_years')} năm")
                         if cv_key_info.get("skills"):

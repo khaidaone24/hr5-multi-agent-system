@@ -13,6 +13,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import google.generativeai as genai
 import time
+from datetime import datetime
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 class CVAgent:
@@ -30,6 +31,7 @@ class CVAgent:
         genai.configure(api_key=self.GEMINI_API_KEY)
         
         # LLM cho agent
+        self.model_name = "models/gemini-2.0-flash-exp"  # Model chính cho CV analysis
         self.llm = ChatGoogleGenerativeAI(
             model="models/gemini-2.0-flash-lite",
             google_api_key=self.GEMINI_API_KEY,
@@ -292,9 +294,14 @@ Return ONLY this JSON format:
             error_msg = str(e)
             
             if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
-                print(f" 🚨 RATE LIMIT HIT! Dừng phân tích ngay lập tức...")
-                print(f" 🚨 Lỗi: {error_msg[:100]}")
-                return 0, f"Rate limit exceeded. Hệ thống đã dừng phân tích để tránh lỗi API.", {}
+                print(f"\n🚨🚨🚨 RATE LIMIT ERROR 429 🚨🚨🚨")
+                print(f"📱 Model đang sử dụng: {self.model_name}")
+                print(f"❌ Lỗi: {error_msg}")
+                print(f"⏰ Thời gian: {datetime.now().strftime('%H:%M:%S')}")
+                print(f"🛑 Hệ thống đã dừng phân tích để tránh lỗi API")
+                print(f"💡 Giải pháp: Vui lòng thử lại sau 1-2 phút")
+                print(f"🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+                return 0, f"🚨 RATE LIMIT ERROR 429: {error_msg[:200]}", {}
             else:
                 print(f" Gemini error: {error_msg[:100]}")
                 return 0, f"API Error: {error_msg[:100]}", {}
@@ -306,6 +313,7 @@ Return ONLY this JSON format:
         try:
             print(f" CV Agent: Xử lý yêu cầu '{user_input}'")
             print(f" CV Agent: Uploaded files: {uploaded_files}")
+            print(f"🤖 Model đang sử dụng: {self.model_name}")
             
             # Nếu có file được upload, so sánh với job requirements
             if uploaded_files and len(uploaded_files) > 0:
@@ -492,12 +500,12 @@ Return ONLY this JSON format:
                     print(f" CV Agent: Kết quả đánh giá {job_title}: {score}%")
                     
                     # Kiểm tra rate limit
-                    if "Rate limit exceeded" in analysis:
+                    if "Rate limit exceeded" in analysis or "429" in analysis:
                         print(f" CV Agent: Rate limit hit! Dừng phân tích...")
                         return {
                             "cv_name": Path(cv_path).name,
                             "status": "error",
-                            "error": "Rate limit exceeded. Vui lòng thử lại sau.",
+                            "error": f"🚨 RATE LIMIT ERROR 429: {analysis}",
                             "cv_key_info": cv_key_info
                         }
                     
