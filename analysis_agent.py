@@ -634,6 +634,20 @@ Yêu cầu định dạng câu trả lời:
                     }
                 }
             
+            # Debug: In chi tiết từng agent result
+            print(f"🧠 Analysis Agent: Nhận được {len(agent_results)} kết quả từ orchestrator")
+            for i, result in enumerate(agent_results):
+                print(f"  Result {i}: agent={result.get('agent')}, status={result.get('status')}")
+                if result.get('agent') == 'cv_agent':
+                    cv_result = result.get('result', {})
+                    print(f"    CV Agent result keys: {list(cv_result.keys())}")
+                            if 'cv_evaluations' in cv_result:
+                        cv_count = len(cv_result['cv_evaluations'])
+                        print(f"    CV evaluations count: {cv_count}")
+                        for j, evaluation in enumerate(cv_result['cv_evaluations']):
+                            cv_name = evaluation.get('cv_name', f'CV_{j}')
+                            print(f"      CV {j+1}: {cv_name}")
+            
             # Trích xuất và phân loại kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
             
@@ -644,22 +658,22 @@ Yêu cầu định dạng câu trả lời:
             ai_analysis = ""
             if self.ai_enabled:
                 # Tìm dữ liệu bảng để phân tích
-                first_table = None
-                for r in agent_results:
-                    if not r:
-                        continue
-                    res = r.get("result")
-                    if isinstance(res, dict) and res.get("columns") and res.get("data"):
-                        first_table = res
-                        break
+            first_table = None
+            for r in agent_results:
+                if not r:
+                    continue
+                res = r.get("result")
+                if isinstance(res, dict) and res.get("columns") and res.get("data"):
+                    first_table = res
+                    break
                     elif isinstance(res, list) and res and all(isinstance(x, dict) for x in res):
-                        converted = self._list_of_dicts_to_table(res)
-                        if converted and converted.get("data"):
-                            first_table = converted
-                            break
-                
-                ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
+                    converted = self._list_of_dicts_to_table(res)
+                    if converted and converted.get("data"):
+                        first_table = converted
+                        break
             
+            ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
+
             # Tạo markdown summary đẹp mắt
             markdown_summary = summary_report.get("formatted_summary", "")
             if ai_analysis:

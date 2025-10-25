@@ -309,6 +309,14 @@ Lưu ý đặc biệt:
                 from analysis_agent import AnalysisAgent
                 agent = AnalysisAgent()
                 # Truyền tất cả kết quả từ các agent trước đó
+                print(f" Orchestrator: Truyền {len(accumulated_results or [])} kết quả cho Analysis Agent")
+                for i, result in enumerate(accumulated_results or []):
+                    print(f"  Result {i}: agent={result.get('agent')}, status={result.get('status')}")
+                    if result.get('agent') == 'cv_agent':
+                        print(f"    CV Agent result keys: {list(result.get('result', {}).keys())}")
+                        if 'cv_evaluations' in result.get('result', {}):
+                            cv_count = len(result['result']['cv_evaluations'])
+                            print(f"    CV evaluations count: {cv_count}")
                 return await agent.process(user_input, accumulated_results or [])
                 
             else:
