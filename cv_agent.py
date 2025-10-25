@@ -352,7 +352,9 @@ Return ONLY this JSON format:
                     # 3. Sửa quotes không đúng
                     self._fix_json_quotes(result_text),
                     # 4. Loại bỏ text trước và sau JSON
-                    self._extract_clean_json(result_text)
+                    self._extract_clean_json(result_text),
+                    # 5. Sửa trailing comma
+                    self._fix_trailing_comma(result_text)
                 ]
                 
                 for i, cleaned_json in enumerate(json_attempts):
@@ -812,6 +814,27 @@ Return ONLY this JSON format:
                 "status": "error",
                 "error": str(e)
             }
+    
+    def _fix_trailing_comma(self, text: str) -> str:
+        """Sửa trailing comma trong JSON"""
+        try:
+            # Tìm JSON object trong text
+            if "```json" in text:
+                json_text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                json_text = text.split("```")[1].split("```")[0].strip()
+            else:
+                json_text = text.strip()
+            
+            # Sửa trailing comma
+            # Loại bỏ trailing comma trước }
+            json_text = re.sub(r',\s*}', '}', json_text)
+            # Loại bỏ trailing comma trước ]
+            json_text = re.sub(r',\s*]', ']', json_text)
+            
+            return json_text
+        except Exception:
+            return ""
     
     async def _find_candidates(self, user_input: str) -> Dict[str, Any]:
         """Tìm ứng viên phù hợp dựa trên yêu cầu"""
