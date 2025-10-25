@@ -67,12 +67,12 @@ class AnalysisAgent:
         score = best_match.get("score", 0)
         score_icon = "🟢" if score >= 70 else "🟡" if score >= 50 else "🔴"
         
-        lines.append("**🎯 Xếp hạng AI (beta)**")
+        lines.append("**Xếp hạng AI (beta)**")
         lines.append(f"**Điểm: {score_icon} {score}%**\n")
         
         # Detailed scores
         if best_match.get("detailed_scores"):
-            lines.append("**📊 Phân tích chi tiết:**")
+            lines.append("**Phân tích chi tiết:**")
             for criteria, data in best_match["detailed_scores"].items():
                 criteria_name = self._get_criteria_name(criteria)
                 score = data.get("score", 0)
@@ -82,12 +82,12 @@ class AnalysisAgent:
         
         # Strengths & Weaknesses
         if best_match.get("strengths"):
-            lines.append("**✅ Điểm mạnh:**")
+            lines.append("**Điểm mạnh:**")
             lines.extend([f"- {s}" for s in best_match["strengths"]])
             lines.append("")
         
         if best_match.get("weaknesses"):
-            lines.append("**❌ Điểm cần cải thiện:**")
+            lines.append("**Điểm cần cải thiện:**")
             lines.extend([f"- {w}" for w in best_match["weaknesses"]])
             lines.append("")
         
@@ -98,7 +98,7 @@ class AnalysisAgent:
     
     def _format_all_evaluations(self, evaluations: List[Dict[str, Any]]) -> List[str]:
         """Format all job evaluations"""
-        lines = ["**📋 CHI TIẾT TẤT CẢ VỊ TRÍ:**\n"]
+        lines = ["**CHI TIẾT TẤT CẢ VỊ TRÍ:**\n"]
         
         for eval_item in evaluations:
             job = eval_item.get("job_title", "Unknown")
@@ -106,7 +106,7 @@ class AnalysisAgent:
             analysis = eval_item.get("analysis", "")
             icon = "🟢" if score >= 70 else "🟡" if score >= 50 else "🔴"
             
-            lines.append(f"**🎯 {job}**")
+            lines.append(f"**{job}**")
             lines.append(f"- **Điểm:** {icon} {score}%")
             lines.append(f"- **Phân tích:** {analysis}")
             
@@ -151,7 +151,7 @@ class AnalysisAgent:
             "",
             "🚨" * 20,
             "**LỖI RATE LIMIT 429**",
-            f"❌ **Lỗi:** {error_msg}",
+            f"**Lỗi:** {error_msg}",
             "⏰ **Thời gian:** " + datetime.now().strftime('%H:%M:%S'),
             "🛑 **Hệ thống đã dừng để tránh lỗi API**",
             "💡 **Giải pháp:** Thử lại sau 1-2 phút",
@@ -162,7 +162,7 @@ class AnalysisAgent:
     
     def _create_donut_chart_section(self, score: int, cv_name: str) -> List[str]:
         """Create donut chart section"""
-        lines = ["**📈 Biểu đồ đánh giá:**"]
+        lines = ["**Biểu đồ đánh giá:**"]
         
         try:
             from chart_agent import ChartAgent
@@ -225,7 +225,7 @@ class AnalysisAgent:
         
         # Header
         summary_parts.extend([
-            "## 📋 Báo Cáo Tổng Hợp",
+            "## Báo Cáo Tổng Hợp",
             f"**Yêu cầu:** {user_input}",
             f"**Thời gian:** {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
             ""
@@ -236,7 +236,7 @@ class AnalysisAgent:
         total = len([r for r in agent_results.values() if r is not None])
         
         summary_parts.extend([
-            "### 🎯 Tóm Tắt Thực Hiện",
+            "### Tóm Tắt Thực Hiện",
             f"- **Tổng số agent:** {total}",
             f"- **Thành công:** {successful}",
             f"- **Tỷ lệ:** {(successful/total*100):.1f}%" if total > 0 else "- **Tỷ lệ:** 0%",
@@ -246,12 +246,12 @@ class AnalysisAgent:
         # Key Findings
         key_findings = self._generate_key_findings(agent_results)
         if key_findings:
-            summary_parts.append("### 🔍 Phát Hiện Chính")
+            summary_parts.append("### Phát Hiện Chính")
             summary_parts.extend([f"- {f}" for f in key_findings])
             summary_parts.append("")
         
         # Agent Results
-        summary_parts.append("### 📊 Kết Quả Chi Tiết")
+        summary_parts.append("### Kết Quả Chi Tiết")
         for agent_name, result in agent_results.items():
             if result:
                 summary_parts.extend(self._format_agent_result(agent_name, result))
@@ -262,16 +262,16 @@ class AnalysisAgent:
         """Format một agent result"""
         lines = []
         status_icon = {
-            "success": "✅",
-            "error": "❌"
-        }.get(result.get("status"), "⚠️")
+            "success": "Thành công",
+            "error": "Lỗi"
+        }.get(result.get("status"), "Không xác định")
         
         agent_display = {
-            "query_agent": "🔍 Query Agent",
-            "cv_agent": "👥 CV Agent",
-            "chart_agent": "📈 Chart Agent",
-            "analysis_agent": "🧠 Analysis Agent"
-        }.get(agent_name, f"🤖 {agent_name}")
+            "query_agent": "Query Agent",
+            "cv_agent": "CV Agent",
+            "chart_agent": "Chart Agent",
+            "analysis_agent": "Analysis Agent"
+        }.get(agent_name, agent_name)
         
         lines.append(f"#### {status_icon} {agent_display}")
         lines.append(f"- **Trạng thái:** {self._summarize_agent_result(result)}")
@@ -287,7 +287,7 @@ class AnalysisAgent:
         
         # CV specific formatting
         if agent_name == "cv_agent" and key_data.get("full_cv_data"):
-            lines.append("\n##### 📋 Báo Cáo Đánh Giá Ứng Viên")
+            lines.append("\n##### Báo Cáo Đánh Giá Ứng Viên")
             for i, evaluation in enumerate(key_data["full_cv_data"], 1):
                 lines.extend(self._format_cv_evaluation(evaluation, i))
         
@@ -307,7 +307,7 @@ class AnalysisAgent:
         if result.get("status") != "success":
             return key_data
         
-        agent_name = result.get("agent", "unknown")
+            agent_name = result.get("agent", "unknown")
         result_data = result.get("result", {})
         
         if agent_name == "cv_agent":
@@ -320,7 +320,7 @@ class AnalysisAgent:
                 "successful_analysis": len([e for e in cv_evaluations if e.get("status") == "success"])
             }
         
-        elif agent_name == "chart_agent":
+            elif agent_name == "chart_agent":
             key_data["data_type"] = "chart_creation"
             key_data["data_summary"] = result_data.get("summary", "Tạo biểu đồ")
             key_data["files_created"] = result_data.get("files_created", [])
@@ -408,9 +408,9 @@ Ví dụ format:
 **Phòng Nhân sự** (PB01)
 - 📝 Mô tả: Quản lý nhân sự và tuyển dụng  
 - 📅 Ngày thành lập: 2010-01-01
-- ✅ Trạng thái: Đang hoạt động
+- Trạng thái: Đang hoạt động
 
-**📊 Tổng kết:** Có 3 phòng ban đang hoạt động trong hệ thống.
+**Tổng kết:** Có 3 phòng ban đang hoạt động trong hệ thống.
 
 Chỉ trả về markdown, không cần giải thích thêm.
 """
@@ -420,7 +420,7 @@ Chỉ trả về markdown, không cần giải thích thêm.
             
         except Exception as e:
             logger.error(f"Error generating LLM query analysis: {e}")
-            return f"### 📊 Kết Quả Truy Vấn\n\nĐã truy vấn thành công. Có {len(data)} bản ghi được trả về."
+            return f"### Kết Quả Truy Vấn\n\nĐã truy vấn thành công. Có {len(data)} bản ghi được trả về."
     
     
     def _summarize_agent_result(self, result: Dict[str, Any]) -> str:
@@ -431,18 +431,18 @@ Chỉ trả về markdown, không cần giải thích thêm.
             
             if agent_name == "cv_agent":
                 if key_data.get("full_cv_data"):
-                    return f"✅ Phân tích CV và ứng viên thành công"
+                    return f"Phân tích CV và ứng viên thành công"
             elif agent_name == "chart_agent":
                 if key_data["files_created"]:
-                    return f"✅ Tạo biểu đồ thành công: {key_data['data_summary']}"
+                    return f"Tạo biểu đồ thành công: {key_data['data_summary']}"
                 else:
-                    return "✅ Tạo biểu đồ thành công"
+                    return "Tạo biểu đồ thành công"
             else:
-                return "✅ Xử lý thành công"
+                return "Xử lý thành công"
         elif result.get("status") == "error":
-            return f"❌ Lỗi: {result.get('error', 'Unknown error')}"
+            return f"Lỗi: {result.get('error', 'Unknown error')}"
         else:
-            return "⚠️ Trạng thái không xác định"
+            return "Trạng thái không xác định"
     
     async def process(self, user_input: str, agent_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Main processing method"""
@@ -464,13 +464,13 @@ Chỉ trả về markdown, không cần giải thích thêm.
         if ai_analysis:
             markdown_summary += "\n\n" + ai_analysis
 
-        return {
-            "agent": "analysis_agent",
-            "status": "success",
-            "result": {
+            return {
+                "agent": "analysis_agent",
+                "status": "success",
+                "result": {
                 "formatted_summary": markdown_summary,
-                "summary_report": summary_report,
-                "ai_analysis": ai_analysis,
+                    "summary_report": summary_report,
+                    "ai_analysis": ai_analysis,
                 "key_findings": summary_report.get("key_findings", []),
                 "execution_stats": {
                     "total_agents": summary_report["execution_summary"]["total_agents"],
