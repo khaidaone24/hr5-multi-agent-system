@@ -526,15 +526,49 @@ class AnalysisAgent:
                             
                             summary_parts.append("")
                         
-                        # Tất cả đánh giá
+                        # Tất cả đánh giá chi tiết
                         if evaluation.get("all_evaluations"):
-                            summary_parts.append("**📋 Tất cả đánh giá:**")
+                            summary_parts.append("**📋 CHI TIẾT ĐÁNH GIÁ TẤT CẢ VỊ TRÍ:**")
+                            summary_parts.append("")
+                            
                             for eval_item in evaluation["all_evaluations"]:
                                 eval_job = eval_item.get("job_title", "Unknown")
                                 eval_score = eval_item.get("score", 0)
+                                eval_analysis = eval_item.get("analysis", "")
                                 eval_color = "🟢" if eval_score >= 70 else "🟡" if eval_score >= 50 else "🔴"
-                                summary_parts.append(f"- {eval_job}: {eval_color} {eval_score}%")
-                            summary_parts.append("")
+                                
+                                summary_parts.append(f"**🎯 {eval_job}**")
+                                summary_parts.append(f"- **Điểm số:** {eval_color} {eval_score}%")
+                                summary_parts.append(f"- **Phân tích:** {eval_analysis}")
+                                
+                                # Hiển thị detailed scores nếu có
+                                if eval_item.get("detailed_scores"):
+                                    summary_parts.append("- **Phân tích chi tiết:**")
+                                    for criteria, data in eval_item["detailed_scores"].items():
+                                        criteria_name = {
+                                            "job_title": "Chức danh",
+                                            "skills": "Kỹ năng", 
+                                            "experience": "Kinh nghiệm",
+                                            "education": "Học vấn"
+                                        }.get(criteria, criteria)
+                                        criteria_score = data.get("score", 0)
+                                        criteria_analysis = data.get("analysis", "")
+                                        summary_parts.append(f"  - {criteria_name} ({criteria_score}%): {criteria_analysis}")
+                                
+                                # Hiển thị strengths và weaknesses
+                                if eval_item.get("strengths"):
+                                    summary_parts.append("- **Điểm mạnh:**")
+                                    for strength in eval_item["strengths"]:
+                                        summary_parts.append(f"  + {strength}")
+                                
+                                if eval_item.get("weaknesses"):
+                                    summary_parts.append("- **Điểm cần cải thiện:**")
+                                    for weakness in eval_item["weaknesses"]:
+                                        summary_parts.append(f"  - {weakness}")
+                                
+                                summary_parts.append("")
+                                summary_parts.append("---")
+                                summary_parts.append("")
                         
                         summary_parts.append("---")
                         summary_parts.append("")
@@ -680,13 +714,49 @@ class AnalysisAgent:
                                     cv_summary.append(f"⭐ **Điểm số:** {score}%")
                                     cv_summary.append(f"📝 **Phân tích chi tiết:** {analysis}")
                                     
-                                    # Hiển thị tất cả đánh giá nếu có
+                                    # Hiển thị tất cả đánh giá chi tiết
                                     if evaluation.get("all_evaluations"):
-                                        cv_summary.append("📊 **Tất cả đánh giá:**")
+                                        cv_summary.append("📊 **CHI TIẾT ĐÁNH GIÁ TẤT CẢ VỊ TRÍ:**")
+                                        cv_summary.append("")
+                                        
                                         for eval_item in evaluation["all_evaluations"]:
                                             eval_job = eval_item.get("job_title", "Unknown")
                                             eval_score = eval_item.get("score", 0)
-                                            cv_summary.append(f"  - {eval_job}: {eval_score}%")
+                                            eval_analysis = eval_item.get("analysis", "")
+                                            eval_color = "🟢" if eval_score >= 70 else "🟡" if eval_score >= 50 else "🔴"
+                                            
+                                            cv_summary.append(f"**🎯 {eval_job}**")
+                                            cv_summary.append(f"- **Điểm số:** {eval_color} {eval_score}%")
+                                            cv_summary.append(f"- **Phân tích:** {eval_analysis}")
+                                            
+                                            # Hiển thị detailed scores
+                                            if eval_item.get("detailed_scores"):
+                                                cv_summary.append("- **Phân tích chi tiết:**")
+                                                for criteria, data in eval_item["detailed_scores"].items():
+                                                    criteria_name = {
+                                                        "job_title": "Chức danh",
+                                                        "skills": "Kỹ năng", 
+                                                        "experience": "Kinh nghiệm",
+                                                        "education": "Học vấn"
+                                                    }.get(criteria, criteria)
+                                                    criteria_score = data.get("score", 0)
+                                                    criteria_analysis = data.get("analysis", "")
+                                                    cv_summary.append(f"  - {criteria_name} ({criteria_score}%): {criteria_analysis}")
+                                            
+                                            # Hiển thị strengths và weaknesses
+                                            if eval_item.get("strengths"):
+                                                cv_summary.append("- **Điểm mạnh:**")
+                                                for strength in eval_item["strengths"]:
+                                                    cv_summary.append(f"  + {strength}")
+                                            
+                                            if eval_item.get("weaknesses"):
+                                                cv_summary.append("- **Điểm cần cải thiện:**")
+                                                for weakness in eval_item["weaknesses"]:
+                                                    cv_summary.append(f"  - {weakness}")
+                                            
+                                            cv_summary.append("")
+                                            cv_summary.append("---")
+                                            cv_summary.append("")
                                 
                                 cv_summary.append("")
                             
@@ -740,12 +810,12 @@ Dữ liệu chính được truy vấn (nếu có):
 HƯỚNG DẪN TRẢ LỜI:
 1. ƯU TIÊN sử dụng kết quả từ QueryAgent nếu có
 2. Nếu có CV Agent results, HIỂN THỊ ĐẦY ĐỦ tất cả thông tin CV (KHÔNG tóm tắt)
-3. Trả lời TRỰC TIẾP câu hỏi của người dùng
-4. Sử dụng dữ liệu cụ thể từ kết quả
-5. Trả lời tự nhiên như đang nói chuyện
-6. Nếu có dữ liệu bảng, nêu các điểm chính
-7. Thêm insights ngắn gọn nếu hữu ích
-8. VỚI CV RESULTS: Hiển thị từng CV với đầy đủ thông tin đánh giá
+3. VỚI CV RESULTS: Hiển thị CHI TIẾT từng vị trí với điểm số, phân tích, strengths, weaknesses
+4. Trả lời TRỰC TIẾP câu hỏi của người dùng
+5. Sử dụng dữ liệu cụ thể từ kết quả
+6. Trả lời tự nhiên như đang nói chuyện
+7. Nếu có dữ liệu bảng, nêu các điểm chính
+8. KHÔNG tóm tắt CV results - hiển thị đầy đủ thông tin
 
 QUAN TRỌNG:
 - CHỈ sử dụng dữ liệu thật từ kết quả agent, KHÔNG tạo dữ liệu giả lập
@@ -760,7 +830,25 @@ VÍ DỤ:
 
 - Người dùng hỏi: "Quét CV này"
 - CV Agent trả về: "CV_John.pdf phù hợp nhất với Business Analyst (85%)"
-- Trả lời: "Đã phân tích CV của bạn. **Kết quả đánh giá**: CV này phù hợp nhất với vị trí **Business Analyst** với điểm số **85%**. [Chi tiết phân tích...]"
+- Trả lời: "Đã phân tích CV của bạn. **Kết quả đánh giá chi tiết**:
+
+**🎯 Business Analyst**
+- **Điểm số:** 🟢 85%
+- **Phân tích:** [Phân tích chi tiết từ CV Agent]
+- **Phân tích chi tiết:**
+  - Chức danh (80%): [Phân tích chức danh]
+  - Kỹ năng (90%): [Phân tích kỹ năng]
+  - Kinh nghiệm (75%): [Phân tích kinh nghiệm]
+  - Học vấn (85%): [Phân tích học vấn]
+- **Điểm mạnh:**
+  + [Strengths từ CV Agent]
+- **Điểm cần cải thiện:**
+  - [Weaknesses từ CV Agent]
+
+**🎯 Data Analyst**
+- **Điểm số:** 🟡 65%
+- **Phân tích:** [Phân tích chi tiết...]
+[Hiển thị đầy đủ tất cả vị trí]"
 
 Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đẹp.
 """.format(
