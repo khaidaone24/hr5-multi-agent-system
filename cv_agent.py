@@ -220,6 +220,9 @@ For each criteria, provide:
 - Detailed analysis
 - Strengths and weaknesses
 
+IMPORTANT: Return ONLY valid JSON format. Do not include any text before or after the JSON. 
+Ensure all strings are properly escaped and quotes are balanced.
+
 Return ONLY this JSON format:
 {{
     "overall_score": <integer 0-100>,
@@ -280,15 +283,34 @@ Return ONLY this JSON format:
                     return 0, f"Content blocked by safety filter"
             
             result_text = response.text
+            print(f" CV Agent: Raw response length: {len(result_text)}")
+            print(f" CV Agent: Raw response preview: {result_text[:200]}...")
             
-            # Clean markdown
+            # Clean markdown và xử lý JSON
             if "```json" in result_text:
                 result_text = result_text.split("```json")[1].split("```")[0].strip()
             elif "```" in result_text:
                 result_text = result_text.split("```")[1].split("```")[0].strip()
             
-            result = json.loads(result_text)
-            return result.get("overall_score", 0), result.get("summary", ""), result
+            # Xử lý JSON với error handling tốt hơn
+            try:
+                result = json.loads(result_text)
+                return result.get("overall_score", 0), result.get("summary", ""), result
+            except json.JSONDecodeError as json_err:
+                print(f" CV Agent: JSON parsing error: {json_err}")
+                print(f" CV Agent: Problematic JSON: {result_text[:500]}...")
+                
+                # Thử sửa JSON bằng cách loại bỏ các ký tự đặc biệt
+                cleaned_json = result_text.replace('\n', ' ').replace('\r', ' ')
+                cleaned_json = re.sub(r'[^\x20-\x7E]', '', cleaned_json)  # Chỉ giữ ASCII printable
+                
+                try:
+                    result = json.loads(cleaned_json)
+                    return result.get("overall_score", 0), result.get("summary", ""), result
+                except:
+                    # Fallback: tạo kết quả mặc định
+                    print(f" CV Agent: Using fallback result due to JSON parsing failure")
+                    return 0, f"JSON parsing error: {str(json_err)[:100]}", {}
             
         except Exception as e:
             error_msg = str(e)

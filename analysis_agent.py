@@ -890,8 +890,8 @@ Yêu cầu định dạng câu trả lời:
                         if converted and converted.get("data"):
                             first_table = converted
                             break
-            
-            ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
+                
+                ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
 
             # Tạo markdown summary đẹp mắt
             markdown_summary = summary_report.get("formatted_summary", "")
