@@ -698,7 +698,8 @@ Chỉ trả về định dạng JSON này:
                 print(f" CV Agent: Đang xử lý CV: {cv_filename}")
                 
                 # Đánh giá CV này với tất cả jobs
-                cv_evaluation = await self._evaluate_single_cv(cv_filename, job_requirements)
+                cv_path = f"uploads/{cv_filename}"
+                cv_evaluation = await self._evaluate_single_cv(cv_path, job_requirements)
                 
                 if cv_evaluation and cv_evaluation.get("status") == "success":
                     all_evaluations.append(cv_evaluation)
