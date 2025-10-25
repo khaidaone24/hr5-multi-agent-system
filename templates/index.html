@@ -549,6 +549,17 @@
             }
         }
         
+        function addRateLimitWarning(content) {
+            const warningHtml = `
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Cảnh báo Rate Limit:</strong> Hệ thống đã đạt giới hạn API calls. 
+                    Một số phân tích có thể không hoàn thành. Vui lòng thử lại sau 1-2 phút.
+                </div>
+            `;
+            return warningHtml + content;
+        }
+        
         function displayResult(data) {
             let response = '';
             
@@ -656,6 +667,12 @@
             
             console.log('Final response length:', response.length);
             console.log('Final response preview:', response.substring(0, 500));
+            
+            // Check for rate limit errors and add warning
+            if (response.includes('429') || response.includes('Rate limit') || response.includes('RATE LIMIT')) {
+                response = addRateLimitWarning(response);
+            }
+            
             addMessage(response, 'agent');
         }
     </script>

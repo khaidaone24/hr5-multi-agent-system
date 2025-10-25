@@ -380,54 +380,76 @@ Chỉ trả về JSON này:
             print(f" CV Agent: Lỗi _get_strengths_weaknesses: {e}")
             return {"strengths": [], "weaknesses": []}
 
-    def _call_gemini_simple(self, prompt: str) -> Dict[str, Any]:
-        """Gọi Gemini với prompt đơn giản và trả về JSON"""
-        try:
-            # Check quota
-            quota = self._check_quota()
-            if not quota["available"]:
-                return {}
-            
-            self._increment_quota()
-            
-            # Configure safety settings
-            safety_settings = [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ]
-            
-            model = genai.GenerativeModel('gemini-2.5-flash-lite')
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
-                    temperature=0.3,
-                    max_output_tokens=1000,  # Nhỏ hơn để tránh truncated
-                    top_p=0.8,
-                ),
-                safety_settings=safety_settings
-            )
-            
-            result_text = response.text.strip()
-            print(f" CV Agent: Simple response length: {len(result_text)}")
-            
-            # Clean markdown
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in result_text:
-                result_text = result_text.split("```")[1].split("```")[0].strip()
-            
-            # Parse JSON
-            result = json.loads(result_text)
-            return result
-            
-        except Exception as e:
-            print(f" CV Agent: Lỗi _call_gemini_simple: {e}")
-            return {}
+    def _call_gemini_simple(self, prompt: str, max_retries: int = 3) -> Dict[str, Any]:
+        """Gọi Gemini với prompt đơn giản và trả về JSON với retry mechanism"""
+        for attempt in range(max_retries):
+            try:
+                # Check quota
+                quota = self._check_quota()
+                if not quota["available"]:
+                    wait_time = quota.get("wait_seconds", 60)
+                    print(f" CV Agent: Quota exceeded, waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                
+                self._increment_quota()
+                
+                # Configure safety settings
+                safety_settings = [
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                ]
+                
+                model = genai.GenerativeModel('gemini-2.5-flash-lite')
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(
+                        temperature=0.3,
+                        max_output_tokens=1000,  # Nhỏ hơn để tránh truncated
+                        top_p=0.8,
+                    ),
+                    safety_settings=safety_settings
+                )
+                
+                result_text = response.text.strip()
+                print(f" CV Agent: Simple response length: {len(result_text)}")
+                
+                # Clean markdown
+                if "```json" in result_text:
+                    result_text = result_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in result_text:
+                    result_text = result_text.split("```")[1].split("```")[0].strip()
+                
+                # Parse JSON
+                result = json.loads(result_text)
+                return result
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f" CV Agent: Attempt {attempt + 1} failed: {error_msg}")
+                
+                # Check if it's a rate limit error
+                if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        # Exponential backoff: wait 2^attempt seconds
+                        wait_time = 2 ** attempt
+                        print(f" CV Agent: Rate limit hit, waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print(f" CV Agent: Max retries reached for rate limit")
+                        return {}
+                else:
+                    # Non-rate-limit error, return empty result
+                    print(f" CV Agent: Non-rate-limit error: {error_msg}")
+                    return {}
+        
+        return {}
 
-    def compare_cv_job_with_gemini(self, cv_text: str, job_text: str, cv_key_info: Optional[Dict] = None) -> tuple:
-        """So sánh CV với yêu cầu công việc bằng Gemini AI - phân tích chi tiết từng tiêu chí"""
+    def compare_cv_job_with_gemini(self, cv_text: str, job_text: str, cv_key_info: Optional[Dict] = None, max_retries: int = 3) -> tuple:
+        """So sánh CV với yêu cầu công việc bằng Gemini AI - phân tích chi tiết từng tiêu chí với retry mechanism"""
         
         # Prepare structured prompt
         key_info_str = ""
@@ -473,131 +495,164 @@ Chỉ trả về định dạng JSON này:
 }}
 """
         
-        try:
-            print(f" CV Agent: Gọi Gemini API cho job...")
-            # Check quota
-            quota = self._check_quota()
-            if not quota["available"]:
-                return 0, quota["message"]
-            
-            self._increment_quota()
-            
-            # Configure safety settings
-            safety_settings = [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ]
-            
-            model = genai.GenerativeModel('gemini-2.5-flash-lite')
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
-                    temperature=0.3,
-                    max_output_tokens=2000,  # Tăng token limit
-                    top_p=0.8,
-                ),
-                safety_settings=safety_settings
-            )
-            
-            # Check if blocked
-            if hasattr(response, 'prompt_feedback') and hasattr(response.prompt_feedback, 'block_reason'):
-                if response.prompt_feedback.block_reason:
-                    return 0, f"Content blocked by safety filter"
-            
-            result_text = response.text
-            print(f" CV Agent: Raw response length: {len(result_text)}")
-            print(f" CV Agent: Raw response preview: {result_text[:200]}...")
-            
-            # Kiểm tra nếu response bị cắt - cải thiện detection
-            if not result_text.strip().endswith('}') and '{' in result_text:
-                print(f" CV Agent: Response appears to be truncated, attempting to fix...")
-                # Thêm } cuối nếu thiếu
-                open_braces = result_text.count('{')
-                close_braces = result_text.count('}')
-                missing_braces = open_braces - close_braces
-                if missing_braces > 0:
-                    result_text += '}' * missing_braces
-                    print(f" CV Agent: Added {missing_braces} closing braces")
-            
-            # Kiểm tra nếu response quá ngắn (có thể bị cắt)
-            if len(result_text) < 100:
-                print(f" CV Agent: Response too short, likely truncated")
-                return 0, "Response too short - likely API truncation", {}
-            
-            # Clean markdown và xử lý JSON
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in result_text:
-                result_text = result_text.split("```")[1].split("```")[0].strip()
-            
-            # Xử lý JSON với error handling tốt hơn
+        for attempt in range(max_retries):
             try:
-                result = json.loads(result_text)
-                return result.get("overall_score", 0), result.get("summary", ""), result
-            except json.JSONDecodeError as json_err:
-                print(f" CV Agent: JSON parsing error: {json_err}")
-                print(f" CV Agent: Problematic JSON: {result_text[:500]}...")
+                print(f" CV Agent: Gọi Gemini API cho job... (Attempt {attempt + 1}/{max_retries})")
                 
-                # Thử nhiều cách sửa JSON
-                json_attempts = [
-                    # 1. Loại bỏ ký tự đặc biệt
-                    re.sub(r'[^\x20-\x7E]', '', result_text.replace('\n', ' ').replace('\r', ' ')),
-                    # 2. Tìm JSON object trong text
-                    self._extract_json_from_text(result_text),
-                    # 3. Sửa quotes không đúng
-                    self._fix_json_quotes(result_text),
-                    # 4. Loại bỏ text trước và sau JSON
-                    self._extract_clean_json(result_text),
-                    # 5. Sửa trailing comma
-                    self._fix_trailing_comma(result_text)
+                # Check quota
+                quota = self._check_quota()
+                if not quota["available"]:
+                    wait_time = quota.get("wait_seconds", 60)
+                    print(f" CV Agent: Quota exceeded, waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                    continue
+                
+                self._increment_quota()
+                
+                # Configure safety settings
+                safety_settings = [
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
                 ]
                 
-                for i, cleaned_json in enumerate(json_attempts):
-                    if not cleaned_json:
-                        continue
-                    try:
-                        print(f" CV Agent: Trying JSON fix attempt {i+1}")
-                        result = json.loads(cleaned_json)
-                        print(f" CV Agent: JSON parsing successful with attempt {i+1}")
-                        return result.get("overall_score", 0), result.get("summary", ""), result
-                    except Exception as e:
-                        print(f" CV Agent: Attempt {i+1} failed: {str(e)[:50]}")
-                        continue
+                model = genai.GenerativeModel('gemini-2.5-flash-lite')
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(
+                        temperature=0.3,
+                        max_output_tokens=2000,  # Tăng token limit
+                        top_p=0.8,
+                    ),
+                    safety_settings=safety_settings
+                )
                 
-                # Fallback: tạo kết quả mặc định với thông tin cơ bản
-                print(f" CV Agent: All JSON parsing attempts failed, using fallback")
-                fallback_result = {
-                    "overall_score": 50,  # Điểm trung bình
-                    "detailed_scores": {
-                        "job_title": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
-                        "skills": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
-                        "experience": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
-                        "education": {"score": 50, "analysis": "Không thể phân tích chi tiết"}
-                    },
-                    "strengths": ["Cần phân tích thêm"],
-                    "weaknesses": ["Cần phân tích thêm"],
-                    "summary": "Lỗi phân tích JSON - cần kiểm tra lại"
-                }
-                return 50, "Lỗi phân tích JSON - cần kiểm tra lại", fallback_result
-            
-        except Exception as e:
-            print(f" CV Agent: Lỗi trong compare_cv_job_with_gemini: {e}")
-            error_msg = str(e)
-            
-            if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
-                print(f"\n🚨🚨🚨 RATE LIMIT ERROR 429 🚨🚨🚨")
-                print(f"📱 Model đang sử dụng: {self.model_name}")
-                print(f"❌ Lỗi: {error_msg}")
-                print(f"⏰ Thời gian: {datetime.now().strftime('%H:%M:%S')}")
-                print(f"🛑 Hệ thống đã dừng phân tích để tránh lỗi API")
-                print(f"💡 Giải pháp: Vui lòng thử lại sau 1-2 phút")
-                print(f"🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
-                return 0, f"🚨 RATE LIMIT ERROR 429: {error_msg[:200]}", {}
-            else:
-                print(f" Gemini error: {error_msg[:100]}")
-                return 0, f"API Error: {error_msg[:100]}", {}
+                # Check if blocked
+                if hasattr(response, 'prompt_feedback') and hasattr(response.prompt_feedback, 'block_reason'):
+                    if response.prompt_feedback.block_reason:
+                        return 0, f"Content blocked by safety filter", {}
+                
+                result_text = response.text
+                print(f" CV Agent: Raw response length: {len(result_text)}")
+                print(f" CV Agent: Raw response preview: {result_text[:200]}...")
+                
+                # Kiểm tra nếu response bị cắt - cải thiện detection
+                if not result_text.strip().endswith('}') and '{' in result_text:
+                    print(f" CV Agent: Response appears to be truncated, attempting to fix...")
+                    # Thêm } cuối nếu thiếu
+                    open_braces = result_text.count('{')
+                    close_braces = result_text.count('}')
+                    missing_braces = open_braces - close_braces
+                    if missing_braces > 0:
+                        result_text += '}' * missing_braces
+                        print(f" CV Agent: Added {missing_braces} closing braces")
+                
+                # Kiểm tra nếu response quá ngắn (có thể bị cắt)
+                if len(result_text) < 100:
+                    print(f" CV Agent: Response too short, likely truncated")
+                    if attempt < max_retries - 1:
+                        print(f" CV Agent: Retrying due to short response...")
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                    else:
+                        return 0, "Response too short - likely API truncation", {}
+                
+                # Clean markdown và xử lý JSON
+                if "```json" in result_text:
+                    result_text = result_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in result_text:
+                    result_text = result_text.split("```")[1].split("```")[0].strip()
+                
+                # Xử lý JSON với error handling tốt hơn
+                try:
+                    result = json.loads(result_text)
+                    return result.get("overall_score", 0), result.get("summary", ""), result
+                except json.JSONDecodeError as json_err:
+                    print(f" CV Agent: JSON parsing error: {json_err}")
+                    print(f" CV Agent: Problematic JSON: {result_text[:500]}...")
+                    
+                    # Thử nhiều cách sửa JSON
+                    json_attempts = [
+                        # 1. Loại bỏ ký tự đặc biệt
+                        re.sub(r'[^\x20-\x7E]', '', result_text.replace('\n', ' ').replace('\r', ' ')),
+                        # 2. Tìm JSON object trong text
+                        self._extract_json_from_text(result_text),
+                        # 3. Sửa quotes không đúng
+                        self._fix_json_quotes(result_text),
+                        # 4. Loại bỏ text trước và sau JSON
+                        self._extract_clean_json(result_text),
+                        # 5. Sửa trailing comma
+                        self._fix_trailing_comma(result_text)
+                    ]
+                    
+                    for i, cleaned_json in enumerate(json_attempts):
+                        if not cleaned_json:
+                            continue
+                        try:
+                            print(f" CV Agent: Trying JSON fix attempt {i+1}")
+                            result = json.loads(cleaned_json)
+                            print(f" CV Agent: JSON parsing successful with attempt {i+1}")
+                            return result.get("overall_score", 0), result.get("summary", ""), result
+                        except Exception as e:
+                            print(f" CV Agent: Attempt {i+1} failed: {str(e)[:50]}")
+                            continue
+                    
+                    # If JSON parsing fails and this is not the last attempt, retry
+                    if attempt < max_retries - 1:
+                        print(f" CV Agent: JSON parsing failed, retrying...")
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                    
+                    # Fallback: tạo kết quả mặc định với thông tin cơ bản
+                    print(f" CV Agent: All JSON parsing attempts failed, using fallback")
+                    fallback_result = {
+                        "overall_score": 50,  # Điểm trung bình
+                        "detailed_scores": {
+                            "job_title": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
+                            "skills": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
+                            "experience": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
+                            "education": {"score": 50, "analysis": "Không thể phân tích chi tiết"}
+                        },
+                        "strengths": ["Cần phân tích thêm"],
+                        "weaknesses": ["Cần phân tích thêm"],
+                        "summary": "Lỗi phân tích JSON - cần kiểm tra lại"
+                    }
+                    return 50, "Lỗi phân tích JSON - cần kiểm tra lại", fallback_result
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f" CV Agent: Attempt {attempt + 1} failed: {error_msg}")
+                
+                # Check if it's a rate limit error
+                if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                    if attempt < max_retries - 1:
+                        # Exponential backoff: wait 2^attempt seconds
+                        wait_time = 2 ** attempt
+                        print(f" CV Agent: Rate limit hit, waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"\n🚨🚨🚨 RATE LIMIT ERROR 429 🚨🚨🚨")
+                        print(f"📱 Model đang sử dụng: {self.model_name}")
+                        print(f"❌ Lỗi: {error_msg}")
+                        print(f"⏰ Thời gian: {datetime.now().strftime('%H:%M:%S')}")
+                        print(f"🛑 Hệ thống đã dừng phân tích để tránh lỗi API")
+                        print(f"💡 Giải pháp: Vui lòng thử lại sau 1-2 phút")
+                        print(f"🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+                        return 0, f"🚨 RATE LIMIT ERROR 429: {error_msg[:200]}", {}
+                else:
+                    # Non-rate-limit error
+                    if attempt < max_retries - 1:
+                        print(f" CV Agent: Non-rate-limit error, retrying...")
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                    else:
+                        print(f" Gemini error: {error_msg[:100]}")
+                        return 0, f"API Error: {error_msg[:100]}", {}
+        
+        # If we get here, all retries failed
+        return 0, "All retry attempts failed", {}
     
     async def process(self, user_input: str, uploaded_files: List[str] = None) -> Dict[str, Any]:
         """
@@ -863,6 +918,9 @@ Chỉ trả về định dạng JSON này:
                     # Sử dụng chunked analysis để tránh truncated
                     score, analysis, detailed_result = self.compare_cv_job_with_gemini_chunked(cv_text, job_text, cv_key_info)
                     print(f" CV Agent: Kết quả đánh giá {job_title}: {score}%")
+                    
+                    # Thêm delay giữa các API calls để tránh rate limit
+                    time.sleep(2)
                     
                     # Kiểm tra rate limit
                     if "Rate limit exceeded" in analysis or "429" in analysis:

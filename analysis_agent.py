@@ -464,13 +464,13 @@ Chỉ trả về markdown, không cần giải thích thêm.
         if ai_analysis:
             markdown_summary += "\n\n" + ai_analysis
 
-            return {
-                "agent": "analysis_agent",
-                "status": "success",
-                "result": {
+        return {
+            "agent": "analysis_agent",
+            "status": "success",
+            "result": {
                 "formatted_summary": markdown_summary,
-                    "summary_report": summary_report,
-                    "ai_analysis": ai_analysis,
+                "summary_report": summary_report,
+                "ai_analysis": ai_analysis,
                 "key_findings": summary_report.get("key_findings", []),
                 "execution_stats": {
                     "total_agents": summary_report["execution_summary"]["total_agents"],
