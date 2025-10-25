@@ -3,8 +3,22 @@ import json
 import os
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
-import pandas as pd
+
+# Safe imports với fallback
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+    print("⚠️ Warning: langchain_google_genai not available")
+
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    print("⚠️ Warning: pandas not available")
+
 from datetime import datetime
 
 class AnalysisAgent:
@@ -15,11 +29,16 @@ class AnalysisAgent:
     def __init__(self):
         load_dotenv()
         self.GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
+        
+        # Không raise exception, chỉ warning
         if not self.GEMINI_API_KEY:
-            raise ValueError("⚠️ Thiếu GOOGLE_API_KEY trong .env")
+            print("⚠️ Warning: GOOGLE_API_KEY not found, AI analysis will be disabled")
+            self.GEMINI_API_KEY = None
+        
         # Lưu cấu hình, KHÔNG khởi tạo LLM ở đây để tránh gắn với event loop cũ
         self.llm_model = "models/gemini-2.5-flash-lite"
         self.llm_temperature = 0.3
+        self.ai_enabled = LANGCHAIN_AVAILABLE and self.GEMINI_API_KEY is not None
     
     def _extract_agent_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Trích xuất kết quả từ các agent"""
@@ -85,6 +104,10 @@ class AnalysisAgent:
     def _analyze_data_quality(self, data: Any) -> Dict[str, Any]:
         """Phân tích chất lượng dữ liệu"""
         try:
+            # Kiểm tra pandas có available không
+            if not PANDAS_AVAILABLE:
+                return {"error": "Pandas not available for data analysis"}
+            
             if isinstance(data, dict) and "columns" in data and "data" in data:
                 df = pd.DataFrame(data["data"], columns=data["columns"])
             elif isinstance(data, pd.DataFrame):
@@ -272,6 +295,10 @@ class AnalysisAgent:
     async def _ai_analysis(self, user_input: str, agent_results: Dict[str, Any], first_table_data: Optional[Dict[str, Any]] = None) -> str:
         """Phân tích bằng AI"""
         try:
+            # Kiểm tra AI có enabled không
+            if not self.ai_enabled:
+                return "AI analysis is disabled (missing API key or dependencies)"
+            
             # Khởi tạo LLM MỖI LẦN GỌI để tránh lỗi "Event loop is closed"
             llm = ChatGoogleGenerativeAI(
                 model=self.llm_model,
@@ -332,6 +359,10 @@ Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đ�
     async def _final_answer(self, user_input: str, table_markdown: str | None) -> str:
         """Sinh câu trả lời tự nhiên, trực tiếp cho người dùng."""
         try:
+            # Kiểm tra AI có enabled không
+            if not self.ai_enabled:
+                return "AI analysis is disabled (missing API key or dependencies)"
+            
             llm = ChatGoogleGenerativeAI(
                 model=self.llm_model,
                 google_api_key=self.GEMINI_API_KEY,
