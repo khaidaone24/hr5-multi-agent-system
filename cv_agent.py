@@ -1,13 +1,22 @@
 import asyncio
+import logging
 import os
 import json
 import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 try:
     import fitz  # PyMuPDF
 except ImportError:
-    print("Warning: PyMuPDF not installed")
+    logger.warning("PyMuPDF not installed. PDF processing will be limited.")
     fitz = None
 import pandas as pd
 from dotenv import load_dotenv
@@ -396,9 +405,9 @@ Return ONLY this JSON format:
         Xử lý yêu cầu phân tích CV
         """
         try:
-            print(f" CV Agent: Xử lý yêu cầu '{user_input}'")
-            print(f" CV Agent: Uploaded files: {uploaded_files}")
-            print(f"🤖 Model đang sử dụng: {self.model_name}")
+            logger.info(f"Xử lý yêu cầu: {user_input}")
+            logger.info(f"Uploaded files: {uploaded_files}")
+            logger.info(f"Model đang sử dụng: {self.model_name}")
             
             # Nếu có file được upload, so sánh với job requirements
             if uploaded_files and len(uploaded_files) > 0:

@@ -1,123 +1,186 @@
-#!/usr/bin/env python3
-"""
-Enhanced CV Agent với khả năng xử lý file PDF upload
-"""
-
 import asyncio
-import os
+import hashlib
 import json
+import logging
 import re
+import time
+from functools import wraps
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
+
+import google.generativeai as genai
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 try:
     import fitz  # PyMuPDF
 except ImportError:
-    print("Warning: PyMuPDF not installed")
     fitz = None
-import pandas as pd
-from dotenv import load_dotenv
-import google.generativeai as genai
-import time
-from langchain_google_genai import ChatGoogleGenerativeAI
+    logger.warning("PyMuPDF not installed. PDF processing will be limited.")
 
 class EnhancedCVAgent:
-    """
-    Enhanced CV Agent - Xử lý CV với khả năng upload file PDF
-    """
+    """Enhanced CV Agent với rate limiting, retry mechanism, và caching"""
     
     def __init__(self):
-        load_dotenv()
-        self.gemini_api_key = os.getenv("GOOGLE_API_KEY")
+        self.agent_name = "cv_agent"
+        self.model_name = "models/gemini-2.5-flash-lite"
         
-        if not self.gemini_api_key:
-            raise ValueError(" Thiếu GOOGLE_API_KEY trong .env")
+        # Rate limiting
+        self.request_count = 0
+        self.request_window_start = time.time()
+        self.max_requests_per_minute = 10
         
-        # Khởi tạo Gemini AI
-        genai.configure(api_key=self.gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-lite')
+        # File size limit (10MB)
+        self.max_file_size = 10 * 1024 * 1024
         
-        # Khởi tạo LangChain LLM
+        # Cache để tránh xử lý trùng
+        self.cv_cache = {}
+        
+        # Setup LLM
         self.llm = ChatGoogleGenerativeAI(
-            model="models/gemini-2.0-flash-lite",
-            google_api_key=self.gemini_api_key,
+            model=self.model_name,
             temperature=0.1,
+            max_output_tokens=2000
         )
         
-        # Thư mục lưu CVs
-        self.cv_dir = Path("cvs")
-        self.cv_dir.mkdir(exist_ok=True)
+        # Setup genai
+        genai.configure(api_key="AIzaSyBvOkBwv7wjHD5RE1h5abTZgBieUld3o2Y")
+        self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
-        # Thư mục uploads
+        # Upload directory
         self.upload_dir = Path("uploads")
         self.upload_dir.mkdir(exist_ok=True)
     
-    def _has_cv_intent(self, user_input: str) -> bool:
-        """Kiểm tra xem yêu cầu có liên quan đến CV không"""
-        cv_keywords = [
-            'cv', 'resume', 'hồ sơ', 'ứng viên', 'candidate', 
-            'phân tích cv', 'đánh giá cv', 'so sánh cv',
-            'tuyển dụng', 'recruitment', 'job application',
-            'phỏng vấn', 'interview', 'screening'
-        ]
-        user_input_lower = user_input.lower()
-        return any(keyword in user_input_lower for keyword in cv_keywords)
+        # Job requirements
+        self.job_requirements_file = Path("job_requirements/job_requirements.xlsx")
+        
+        logger.info(f"Enhanced CV Agent initialized with model: {self.model_name}")
+    
+    def _rate_limit_check(self, func):
+        """Decorator for rate limiting"""
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            current_time = time.time()
+            
+            # Reset counter nếu qua window
+            if current_time - self.request_window_start > 60:
+                self.request_count = 0
+                self.request_window_start = current_time
+            
+            # Check limit
+            if self.request_count >= self.max_requests_per_minute:
+                wait_time = 60 - (current_time - self.request_window_start)
+                logger.warning(f"Rate limit reached. Waiting {wait_time:.1f}s...")
+                await asyncio.sleep(wait_time)
+                self.request_count = 0
+                self.request_window_start = time.time()
+            
+            self.request_count += 1
+            return await func(*args, **kwargs)
+        
+        return wrapper
+    
+    def _validate_file(self, filepath: Path) -> Tuple[bool, str]:
+        """Validate file before processing"""
+        if not filepath.exists():
+            return False, "File không tồn tại"
+        
+        if filepath.stat().st_size > self.max_file_size:
+            return False, f"File quá lớn (>{self.max_file_size/1024/1024}MB)"
+        
+        if filepath.suffix.lower() != '.pdf':
+            return False, "Chỉ hỗ trợ file PDF"
+        
+        return True, "OK"
+    
+    def _get_file_hash(self, filepath: Path) -> str:
+        """Get file hash for caching"""
+        hasher = hashlib.md5()
+        with open(filepath, 'rb') as f:
+            hasher.update(f.read())
+        return hasher.hexdigest()
     
     def _extract_text_from_pdf(self, pdf_path: str) -> str:
-        """Trích xuất text từ file PDF"""
+        """Trích xuất text với proper error handling"""
         if not fitz:
             return "Lỗi: PyMuPDF chưa được cài đặt"
         
+        doc = None
         try:
             doc = fitz.open(pdf_path)
-            text = ""
-            for page in doc:
-                text += page.get_text()
-            doc.close()
-            return text
+            text_parts = []
+            
+            for page_num, page in enumerate(doc):
+                try:
+                    page_text = page.get_text()
+                    if page_text.strip():
+                        text_parts.append(page_text)
+                except Exception as e:
+                    logger.warning(f"Lỗi đọc trang {page_num + 1}: {e}")
+                    continue
+            
+            return "\n".join(text_parts) if text_parts else "Không thể trích xuất text"
+            
         except Exception as e:
+            logger.error(f"Lỗi đọc PDF: {str(e)}")
             return f"Lỗi đọc PDF: {str(e)}"
+        finally:
+            if doc:
+                doc.close()
     
-    def _extract_cv_info(self, cv_text: str) -> Dict[str, Any]:
-        """Trích xuất thông tin quan trọng từ CV"""
+    @_rate_limit_check
+    async def _extract_cv_info(self, cv_text: str) -> Dict[str, Any]:
+        """Extract với rate limiting và retry"""
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
         try:
             prompt = f"""
-            Phân tích CV sau và trích xuất thông tin quan trọng:
+                Phân tích CV và trả về JSON:
             
-            {cv_text[:3000]}  # Giới hạn độ dài để tránh lỗi
+                {cv_text[:3000]}
             
-            Hãy trả về JSON với format:
+                Format:
             {{
-                "name": "Tên ứng viên",
+                    "name": "Tên",
                 "email": "Email",
-                "phone": "Số điện thoại",
-                "skills": ["skill1", "skill2", ...],
-                "experience_years": "Số năm kinh nghiệm",
+                    "phone": "SĐT",
+                    "skills": ["skill1", "skill2"],
+                    "experience_years": "X năm",
                 "education": "Học vấn",
-                "current_position": "Vị trí hiện tại",
-                "summary": "Tóm tắt ngắn gọn"
+                    "current_position": "Vị trí",
+                    "summary": "Tóm tắt"
             }}
             """
             
             response = self.model.generate_content(prompt)
             result_text = response.text
             
-            # Tìm JSON trong response
             json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group())
             else:
-                return {
-                    "name": "Unknown",
-                    "email": "Unknown",
-                    "phone": "Unknown",
-                    "skills": [],
-                    "experience_years": "Unknown",
-                    "education": "Unknown",
-                    "current_position": "Unknown",
-                    "summary": "Không thể phân tích CV"
-                }
+                    raise ValueError("Không tìm thấy JSON trong response")
                 
         except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Retry {attempt + 1}/{max_retries}: {e}")
+                    await asyncio.sleep(retry_delay * (attempt + 1))
+                else:
+                    logger.error(f"Failed after {max_retries} attempts: {e}")
+                    return self._get_default_cv_info(f"Lỗi sau {max_retries} lần thử: {e}")
+        
+        return self._get_default_cv_info("Unknown error")
+    
+    def _get_default_cv_info(self, error_msg: str) -> Dict[str, Any]:
+        """Default CV info structure"""
             return {
                 "name": "Unknown",
                 "email": "Unknown", 
@@ -126,73 +189,77 @@ class EnhancedCVAgent:
                 "experience_years": "Unknown",
                 "education": "Unknown",
                 "current_position": "Unknown",
-                "summary": f"Lỗi phân tích: {str(e)}"
+            "summary": error_msg
             }
     
-    async def _analyze_cv_with_ai(self, cv_text: str, user_requirement: str) -> str:
-        """Phân tích CV bằng AI theo yêu cầu cụ thể"""
+    @_rate_limit_check
+    async def _analyze_cv_with_ai(self, cv_text: str, user_input: str) -> str:
+        """AI analysis với rate limiting"""
         try:
             prompt = f"""
-            Bạn là một chuyên gia HR với 10 năm kinh nghiệm.
+            Phân tích CV này và đưa ra đánh giá:
             
-            Yêu cầu: {user_requirement}
+            CV: {cv_text[:2000]}
+            Yêu cầu: {user_input}
             
-            CV cần phân tích:
-            {cv_text[:2000]}
-            
-            Hãy phân tích CV này theo yêu cầu và đưa ra:
-            1. Đánh giá tổng quan
-            2. Điểm mạnh
-            3. Điểm yếu
-            4. Khuyến nghị
-            5. Điểm phù hợp (1-10)
-            
-            Trả về kết quả có cấu trúc và dễ hiểu.
+            Đưa ra đánh giá ngắn gọn về:
+            1. Điểm mạnh
+            2. Điểm yếu  
+            3. Khuyến nghị
             """
             
-            response = await self.llm.ainvoke(prompt)
-            return response.content if hasattr(response, 'content') else str(response)
+            response = self.model.generate_content(prompt)
+            return response.text
             
         except Exception as e:
+            logger.error(f"AI analysis failed: {e}")
             return f"Lỗi phân tích AI: {str(e)}"
     
     async def _process_uploaded_files(self, uploaded_files: List[str], user_input: str) -> Dict[str, Any]:
-        """Xử lý các file PDF đã upload"""
-        try:
+        """Process với validation và caching"""
             results = []
             
             for filename in uploaded_files:
                 filepath = self.upload_dir / filename
-                if filepath.exists():
-                    print(f" CV Agent: Phân tích file {filename}")
-                    
-                    # Trích xuất text từ PDF
+            
+            # Validate file
+            is_valid, msg = self._validate_file(filepath)
+            if not is_valid:
+                logger.error(f"File validation failed for {filename}: {msg}")
+                results.append({"filename": filename, "error": msg})
+                continue
+            
+            # Check cache
+            file_hash = self._get_file_hash(filepath)
+            if file_hash in self.cv_cache:
+                logger.info(f"Using cache for {filename}")
+                results.append(self.cv_cache[file_hash])
+                continue
+            
+            logger.info(f"Processing file {filename}")
+            
+            # Extract text
                     cv_text = self._extract_text_from_pdf(str(filepath))
-                    
                     if cv_text.startswith("Lỗi"):
-                        results.append({
-                            "filename": filename,
-                            "error": cv_text
-                        })
+                results.append({"filename": filename, "error": cv_text})
                         continue
                     
-                    # Trích xuất thông tin cơ bản
-                    cv_info = self._extract_cv_info(cv_text)
+            # Extract info với rate limiting
+            cv_info = await self._extract_cv_info(cv_text)
                     
-                    # Phân tích bằng AI
+            # AI analysis với rate limiting
                     ai_analysis = await self._analyze_cv_with_ai(cv_text, user_input)
                     
-                    results.append({
+            result = {
                         "filename": filename,
                         "cv_info": cv_info,
                         "ai_analysis": ai_analysis,
                         "text_length": len(cv_text)
-                    })
-                else:
-                    results.append({
-                        "filename": filename,
-                        "error": "File không tồn tại"
-                    })
+            }
+            
+            # Cache result
+            self.cv_cache[file_hash] = result
+            results.append(result)
             
             return {
                 "agent": "cv_agent",
@@ -200,141 +267,22 @@ class EnhancedCVAgent:
                 "result": {
                     "uploaded_files_analysis": results,
                     "total_files": len(uploaded_files),
-                    "timestamp": asyncio.get_event_loop().time()
-                }
+                "timestamp": time.time()
             }
-            
-        except Exception as e:
-            return {
-                "agent": "cv_agent",
-                "status": "error",
-                "error": f"Lỗi xử lý file upload: {str(e)}"
-            }
-    
-    async def _scan_all_cvs(self, user_input: str) -> Dict[str, Any]:
-        """Quét tất cả CV có sẵn trong hệ thống"""
-        try:
-            # Tìm tất cả file PDF trong thư mục CVs
-            pdf_files = list(self.cv_dir.glob("*.pdf"))
-            
-            if not pdf_files:
-                return {
-                    "agent": "cv_agent",
-                    "status": "info",
-                    "result": {
-                        "message": "Không tìm thấy file CV nào trong hệ thống",
-                        "suggestion": "Hãy upload file PDF hoặc đặt CV vào thư mục 'cvs/'"
-                    }
-                }
-            
-            print(f" CV Agent: Tìm thấy {len(pdf_files)} file CV, bắt đầu phân tích...")
-            
-            results = []
-            for pdf_file in pdf_files:
-                print(f" CV Agent: Phân tích {pdf_file.name}")
-                
-                # Trích xuất text từ PDF
-                cv_text = self._extract_text_from_pdf(str(pdf_file))
-                
-                if cv_text.startswith("Lỗi"):
-                    results.append({
-                        "filename": pdf_file.name,
-                        "error": cv_text
-                    })
-                    continue
-                
-                # Trích xuất thông tin cơ bản
-                cv_info = self._extract_cv_info(cv_text)
-                
-                # Phân tích bằng AI
-                ai_analysis = await self._analyze_cv_with_ai(cv_text, user_input)
-                
-                results.append({
-                    "filename": pdf_file.name,
-                    "cv_info": cv_info,
-                    "ai_analysis": ai_analysis,
-                    "text_length": len(cv_text)
-                })
-            
-            return {
-                "agent": "cv_agent",
-                "status": "success",
-                "result": {
-                    "all_cvs_analysis": results,
-                    "total_cvs": len(pdf_files),
-                    "timestamp": asyncio.get_event_loop().time()
-                }
-            }
-            
-        except Exception as e:
-            return {
-                "agent": "cv_agent",
-                "status": "error",
-                "error": f"Lỗi quét tất cả CV: {str(e)}"
             }
     
     async def process(self, user_input: str, uploaded_files: List[str] = None) -> Dict[str, Any]:
-        """
-        Xử lý yêu cầu phân tích CV với khả năng xử lý file upload
-        """
-        try:
-            print(f" CV Agent: Xử lý yêu cầu '{user_input}'")
-            
-            # Xử lý file upload nếu có
+        """Main processing method"""
+        logger.info(f"Enhanced CV Agent: Processing request: {user_input}")
+        
             if uploaded_files:
-                print(f" CV Agent: Xử lý {len(uploaded_files)} file(s) đã upload")
+            logger.info(f"Processing {len(uploaded_files)} uploaded files")
                 return await self._process_uploaded_files(uploaded_files, user_input)
             else:
-                # Nếu không có file upload nhưng intent có CV, quét tất cả CV
-                if self._has_cv_intent(user_input):
-                    print(" CV Agent: Không có file upload, quét tất cả CV có sẵn")
-                    return await self._scan_all_cvs(user_input)
-                else:
-                    return {
-                        "agent": "cv_agent",
-                        "status": "info",
-                        "result": {
-                            "message": "CV Agent sẵn sàng phân tích CV",
-                            "usage": "Upload file PDF hoặc yêu cầu phân tích CV cụ thể",
-                            "capabilities": [
-                                "Phân tích CV từ file PDF",
-                                "Trích xuất thông tin quan trọng",
-                                "So sánh với yêu cầu công việc",
-                                "Đánh giá và khuyến nghị"
-                            ]
-                        }
-                    }
-            
-        except Exception as e:
             return {
                 "agent": "cv_agent",
                 "status": "error",
-                "error": str(e),
-                "error_type": type(e).__name__
+                "result": {
+                    "error": "No files provided for analysis"
+                }
             }
-
-# Test function
-async def test_enhanced_cv_agent():
-    """Test Enhanced CV Agent"""
-    print("Testing Enhanced CV Agent")
-    print("="*50)
-    
-    agent = EnhancedCVAgent()
-    
-    # Test 1: Không có file upload, không có CV intent
-    print("\nTest 1: Không có CV intent")
-    result1 = await agent.process("Tìm nhân viên có lương cao nhất")
-    print(f"Result: {result1['status']}")
-    
-    # Test 2: Có CV intent nhưng không có file upload
-    print("\nTest 2: Có CV intent, không có file upload")
-    result2 = await agent.process("Phân tích CV của ứng viên Python developer")
-    print(f"Result: {result2['status']}")
-    
-    # Test 3: Có file upload
-    print("\nTest 3: Có file upload")
-    result3 = await agent.process("Phân tích CV này", ["test_cv.pdf"])
-    print(f"Result: {result3['status']}")
-
-if __name__ == "__main__":
-    asyncio.run(test_enhanced_cv_agent())
