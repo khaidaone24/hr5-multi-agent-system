@@ -332,12 +332,21 @@ Chỉ trả về định dạng JSON này:
             print(f" CV Agent: Raw response length: {len(result_text)}")
             print(f" CV Agent: Raw response preview: {result_text[:200]}...")
             
-            # Kiểm tra nếu response bị cắt
+            # Kiểm tra nếu response bị cắt - cải thiện detection
             if not result_text.strip().endswith('}') and '{' in result_text:
                 print(f" CV Agent: Response appears to be truncated, attempting to fix...")
                 # Thêm } cuối nếu thiếu
-                if result_text.count('{') > result_text.count('}'):
-                    result_text += '}'
+                open_braces = result_text.count('{')
+                close_braces = result_text.count('}')
+                missing_braces = open_braces - close_braces
+                if missing_braces > 0:
+                    result_text += '}' * missing_braces
+                    print(f" CV Agent: Added {missing_braces} closing braces")
+            
+            # Kiểm tra nếu response quá ngắn (có thể bị cắt)
+            if len(result_text) < 100:
+                print(f" CV Agent: Response too short, likely truncated")
+                return 0, "Response too short - likely API truncation", {}
             
             # Clean markdown và xử lý JSON
             if "```json" in result_text:
@@ -379,9 +388,21 @@ Chỉ trả về định dạng JSON này:
                         print(f" CV Agent: Attempt {i+1} failed: {str(e)[:50]}")
                         continue
                 
-                # Fallback: tạo kết quả mặc định
+                # Fallback: tạo kết quả mặc định với thông tin cơ bản
                 print(f" CV Agent: All JSON parsing attempts failed, using fallback")
-                return 0, f"JSON parsing error: {str(json_err)[:100]}", {}
+                fallback_result = {
+                    "overall_score": 50,  # Điểm trung bình
+                    "detailed_scores": {
+                        "job_title": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
+                        "skills": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
+                        "experience": {"score": 50, "analysis": "Không thể phân tích chi tiết"},
+                        "education": {"score": 50, "analysis": "Không thể phân tích chi tiết"}
+                    },
+                    "strengths": ["Cần phân tích thêm"],
+                    "weaknesses": ["Cần phân tích thêm"],
+                    "summary": "Lỗi phân tích JSON - cần kiểm tra lại"
+                }
+                return 50, "Lỗi phân tích JSON - cần kiểm tra lại", fallback_result
             
         except Exception as e:
             print(f" CV Agent: Lỗi trong compare_cv_job_with_gemini: {e}")
