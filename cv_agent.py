@@ -37,8 +37,8 @@ class CVAgent:
         )
         
         # Thư mục CV mặc định
-        self.cv_folder = Path("D:/HR4/PDF")
-        self.job_file = Path("D:/HR4/job_requirements/job_requirements.xlsx")
+        self.cv_folder = Path("cvs")
+        self.job_file = Path("job_requirements/job_requirements.xlsx")
         
         # Cache cho quota management
         self._quota_tracker = {"minute": 0, "count": 0}
@@ -266,23 +266,22 @@ Return ONLY this JSON format:
                 print(f" Gemini error: {error_msg[:100]}")
                 return 0, f"API Error: {error_msg[:100]}"
     
-    async def process(self, user_input: str) -> Dict[str, Any]:
+    async def process(self, user_input: str, uploaded_files: List[str] = None) -> Dict[str, Any]:
         """
         Xử lý yêu cầu phân tích CV
         """
         try:
             print(f" CV Agent: Xử lý yêu cầu '{user_input}'")
+            print(f" CV Agent: Uploaded files: {uploaded_files}")
             
-            # Phân tích intent cụ thể
-            if "so sánh" in user_input.lower() or "compare" in user_input.lower():
-                return await self._compare_cvs_with_jobs()
-            elif "phân tích" in user_input.lower() or "analyze" in user_input.lower():
-                return await self._analyze_cvs()
-            elif "tìm ứng viên" in user_input.lower() or "find candidate" in user_input.lower():
-                return await self._find_candidates(user_input)
+            # Nếu có file được upload, so sánh với job requirements
+            if uploaded_files and len(uploaded_files) > 0:
+                print(" CV Agent: Có file được upload, so sánh với job requirements")
+                return await self._compare_uploaded_cv_with_jobs(uploaded_files[0])
             else:
-                # Mặc định: phân tích tất cả CV
-                return await self._analyze_cvs()
+                # Nếu không có file, quét tất cả CV trong thư mục cvs/
+                print(" CV Agent: Không có file upload, quét tất cả CV trong thư mục")
+                return await self._analyze_all_cvs()
                 
         except Exception as e:
             return {
@@ -292,6 +291,169 @@ Return ONLY this JSON format:
                 "error_type": type(e).__name__
             }
     
+    async def _analyze_all_cvs(self) -> Dict[str, Any]:
+        """Phân tích tất cả CV trong thư mục cvs/"""
+        try:
+            print("🔄 CV Agent: Đang quét tất cả CV trong thư mục cvs/...")
+            
+            # Lấy danh sách tất cả file PDF trong thư mục cvs/
+            cv_files = list(self.cv_folder.glob("*.pdf"))
+            
+            if not cv_files:
+                return {
+                    "agent": "cv_agent",
+                    "status": "success",
+                    "result": {
+                        "message": "Không tìm thấy CV nào trong thư mục cvs/",
+                        "cv_count": 0,
+                        "cv_evaluations": []
+                    }
+                }
+            
+            print(f" CV Agent: Tìm thấy {len(cv_files)} CV files")
+            
+            # Đọc job requirements
+            job_requirements = self._load_job_requirements()
+            
+            # Phân tích từng CV
+            cv_evaluations = []
+            for cv_file in cv_files:
+                print(f" CV Agent: Đang phân tích {cv_file.name}")
+                evaluation = await self._evaluate_single_cv(str(cv_file), job_requirements)
+                cv_evaluations.append(evaluation)
+            
+            return {
+                "agent": "cv_agent",
+                "status": "success",
+                "result": {
+                    "message": f"Đã phân tích {len(cv_files)} CV",
+                    "cv_count": len(cv_files),
+                    "cv_evaluations": cv_evaluations
+                }
+            }
+            
+        except Exception as e:
+            return {
+                "agent": "cv_agent",
+                "status": "error",
+                "error": str(e),
+                "error_type": type(e).__name__
+            }
+
+    async def _compare_uploaded_cv_with_jobs(self, uploaded_file: str) -> Dict[str, Any]:
+        """So sánh CV được upload với job requirements"""
+        try:
+            print(f" CV Agent: So sánh CV {uploaded_file} với job requirements")
+            
+            # Đọc job requirements
+            job_requirements = self._load_job_requirements()
+            
+            # Phân tích CV được upload
+            evaluation = await self._evaluate_single_cv(uploaded_file, job_requirements)
+            
+            return {
+                "agent": "cv_agent",
+                "status": "success",
+                "result": {
+                    "message": f"Đã phân tích CV {uploaded_file}",
+                    "cv_count": 1,
+                    "cv_evaluations": [evaluation]
+                }
+            }
+            
+        except Exception as e:
+            return {
+                "agent": "cv_agent",
+                "status": "error",
+                "error": str(e),
+                "error_type": type(e).__name__
+            }
+
+    def _load_job_requirements(self) -> Dict[str, Any]:
+        """Đọc job requirements từ Excel file"""
+        try:
+            if not self.job_file.exists():
+                print(f" CV Agent: Không tìm thấy file {self.job_file}")
+                return {}
+            
+            # Đọc Excel file
+            df = pd.read_excel(self.job_file)
+            print(f" CV Agent: Đã đọc {len(df)} job requirements")
+            
+            # Convert to dict format
+            job_requirements = {}
+            for _, row in df.iterrows():
+                job_title = row.get('Job Title', '')
+                if job_title:
+                    job_requirements[job_title] = {
+                        'skills_required': row.get('Skills Required', ''),
+                        'experience_required': row.get('Experience Required', ''),
+                        'education_required': row.get('Education Required', ''),
+                        'responsibilities': row.get('Responsibilities', ''),
+                        'preferred_keywords': row.get('Preferred Keywords', '')
+                    }
+            
+            return job_requirements
+            
+        except Exception as e:
+            print(f" CV Agent: Lỗi đọc job requirements: {e}")
+            return {}
+
+    async def _evaluate_single_cv(self, cv_path: str, job_requirements: Dict[str, Any]) -> Dict[str, Any]:
+        """Đánh giá một CV cụ thể"""
+        try:
+            # Extract CV content
+            cv_data = self.extract_pdf_with_content(cv_path)
+            if not cv_data or not cv_data.get('text'):
+                return {
+                    "cv_name": Path(cv_path).name,
+                    "status": "error",
+                    "error": "Không thể đọc nội dung CV"
+                }
+            
+            cv_text = cv_data['text']
+            cv_key_info = self.extract_key_info(cv_text)
+            
+            # So sánh với từng job requirement
+            evaluations = []
+            for job_title, job_req in job_requirements.items():
+                job_text = f"""
+                Job Title: {job_title}
+                Skills Required: {job_req.get('skills_required', '')}
+                Experience Required: {job_req.get('experience_required', '')}
+                Education Required: {job_req.get('education_required', '')}
+                Responsibilities: {job_req.get('responsibilities', '')}
+                Preferred Keywords: {job_req.get('preferred_keywords', '')}
+                """
+                
+                # Sử dụng Gemini để đánh giá
+                score, analysis = self.compare_cv_job_with_gemini(cv_text, job_text, cv_key_info)
+                
+                evaluations.append({
+                    "job_title": job_title,
+                    "score": score,
+                    "analysis": analysis,
+                    "cv_key_info": cv_key_info
+                })
+            
+            # Tìm job phù hợp nhất
+            best_match = max(evaluations, key=lambda x: x['score'])
+            
+            return {
+                "cv_name": Path(cv_path).name,
+                "cv_key_info": cv_key_info,
+                "best_match": best_match,
+                "all_evaluations": evaluations,
+                "status": "success"
+            }
+            
+        except Exception as e:
+            return {
+                "cv_name": Path(cv_path).name,
+                "status": "error",
+                "error": str(e)
+            }
+
     async def _analyze_cvs(self) -> Dict[str, Any]:
         """Phân tích tất cả CV trong thư mục"""
         try:

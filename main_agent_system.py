@@ -192,7 +192,7 @@ class MultiAgentSystem:
                 
                 # Bước 1: CV Agent
                 print(" CV Agent: Phân tích CV...")
-                cv_result = await self.cv_agent.process(user_input)
+                cv_result = await self.cv_agent.process(user_input, uploaded_files)
                 
                 # Bước 2: Analysis Agent
                 print(" Analysis Agent: Phân tích tổng hợp...")
@@ -214,7 +214,7 @@ class MultiAgentSystem:
                 print(" Chạy tất cả agents song song...")
                 tasks = [
                     self.query_agent.process(user_input),
-                    self.cv_agent.process(user_input),
+                    self.cv_agent.process(user_input, uploaded_files),
                     self.chart_agent.process(user_input)
                 ]
                 
