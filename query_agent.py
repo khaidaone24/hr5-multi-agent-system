@@ -589,7 +589,7 @@ class QueryAgent:
                                         parts = line.split("'name':")
                                         for part in parts[1:]:  # Bỏ qua phần đầu
                                             name = part.split("'")[1]
-                                schema_map[name.lower()] = "public"
+                                            schema_map[name.lower()] = "public"
                                             table_names.append(name)
                                             print(f"✅ Query Agent - Tìm thấy bảng (text): {name}")
                                     except Exception as parse_error:
