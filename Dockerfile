@@ -4,7 +4,7 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies including Rust (needed for uv)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -13,24 +13,20 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (CRITICAL for MCP)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
+# Install uv via pip (much simpler!)
+RUN pip install --no-cache-dir uv
 
-# Verify uv installation
+# Verify
 RUN uv --version
 
-# Copy requirements first for better caching
+# Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies via pip
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install MCP and postgres-mcp via uv (IMPORTANT)
+# Install MCP
 RUN uv pip install --system mcp postgres-mcp
-
-# Alternative: Install via pip if uv fails
-# RUN pip install --no-cache-dir mcp postgres-mcp
 
 # Copy application code
 COPY . .
@@ -44,15 +40,13 @@ ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-
-# Railway auto-assigns PORT, but default to 5000 for local dev
 ENV PORT=5000
 
 # Health check (Railway uses this)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Expose port (Railway will override with $PORT)
+# Expose port
 EXPOSE ${PORT}
 
 # Run the application
