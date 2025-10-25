@@ -124,7 +124,7 @@ class AnalysisAgent:
                 lines.extend([f"  - {w}" for w in eval_item["weaknesses"]])
             
             # Thêm donut chart cho từng vị trí
-            lines.extend(self._create_donut_chart_section(score, f"{job} - {cv_name}"))
+            lines.extend(self._create_donut_chart_section(score, f"{job}"))
             
             lines.append("\n---\n")
         
@@ -247,8 +247,8 @@ class AnalysisAgent:
         
         # Agent Results
         summary_parts.append("### 📊 Kết Quả Chi Tiết")
-            for agent_name, result in agent_results.items():
-                if result:
+        for agent_name, result in agent_results.items():
+            if result:
                 summary_parts.extend(self._format_agent_result(agent_name, result))
         
         return "\n".join(summary_parts)
@@ -387,13 +387,13 @@ class AnalysisAgent:
         # Tạo markdown summary đẹp mắt
         markdown_summary = summary_report.get("formatted_summary", "")
 
-            return {
-                "agent": "analysis_agent",
-                "status": "success",
-                "result": {
+        return {
+            "agent": "analysis_agent",
+            "status": "success",
+            "result": {
                 "formatted_summary": markdown_summary,
-                    "summary_report": summary_report,
-                    "ai_analysis": ai_analysis,
+                "summary_report": summary_report,
+                "ai_analysis": ai_analysis,
                 "key_findings": summary_report.get("key_findings", []),
                 "execution_stats": {
                     "total_agents": summary_report["execution_summary"]["total_agents"],
