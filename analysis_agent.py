@@ -43,6 +43,7 @@ class AnalysisAgent:
     
     def _extract_agent_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Trích xuất và phân loại kết quả từ các agent"""
+        print(f"🧠 Analysis Agent: Extracting from {len(results)} results")
         agent_results = {
             "query_agent": None,
             "cv_agent": None,
@@ -50,11 +51,14 @@ class AnalysisAgent:
             "analysis_agent": None
         }
         
-        for result in results:
+        for i, result in enumerate(results):
             agent_name = result.get("agent", "unknown")
+            print(f"🧠 Analysis Agent: Result {i}: agent={agent_name}, status={result.get('status')}")
             if agent_name in agent_results:
                 agent_results[agent_name] = result
+                print(f"🧠 Analysis Agent: Added {agent_name} to results")
         
+        print(f"🧠 Analysis Agent: Final extracted results: {list(agent_results.keys())}")
         return agent_results
 
     def _list_of_dicts_to_table(self, items: Any) -> Optional[Dict[str, Any]]:
@@ -962,6 +966,7 @@ Yêu cầu định dạng câu trả lời:
         try:
             print(f"🧠 Analysis Agent: Tổng hợp kết quả cho '{user_input}'")
             print(f"🧠 Analysis Agent: Số lượng agent results: {len(agent_results) if agent_results else 0}")
+            print(f"🧠 Analysis Agent: Agent results: {agent_results}")
             
             if not agent_results:
                 return {
@@ -1017,6 +1022,7 @@ Yêu cầu định dạng câu trả lời:
             
             # Trích xuất và phân loại kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
+            print(f"🧠 Analysis Agent: Extracted results: {extracted_results}")
             
             # Tạo báo cáo tổng hợp với format đẹp
             summary_report = self._create_summary_report(extracted_results, user_input)
