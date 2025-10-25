@@ -23,7 +23,8 @@ from datetime import datetime
 
 class AnalysisAgent:
     """
-    Analysis Agent - Tổng hợp và phân tích kết quả từ các agent khác
+    Analysis Agent - Tổng hợp và trình bày kết quả từ các agent khác theo format đẹp
+    Chỉ tập trung vào việc tổng hợp, phân tích và trình bày kết quả, không thực hiện các tác vụ khác
     """
     
     def __init__(self):
@@ -41,7 +42,7 @@ class AnalysisAgent:
         self.ai_enabled = LANGCHAIN_AVAILABLE and self.GEMINI_API_KEY is not None
     
     def _extract_agent_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Trích xuất kết quả từ các agent"""
+        """Trích xuất và phân loại kết quả từ các agent"""
         agent_results = {
             "query_agent": None,
             "cv_agent": None,
@@ -195,80 +196,211 @@ class AnalysisAgent:
         return insights
     
     def _create_summary_report(self, agent_results: Dict[str, Any], user_input: str) -> Dict[str, Any]:
-        """Tạo báo cáo tổng hợp"""
+        """Tạo báo cáo tổng hợp với format đẹp mắt"""
+        # Đếm số lượng agent thành công
+        successful_agents = [r for r in agent_results.values() if r and r.get("status") == "success"]
+        failed_agents = [r for r in agent_results.values() if r and r.get("status") == "error"]
+        
         report = {
             "timestamp": datetime.now().isoformat(),
             "user_query": user_input,
             "execution_summary": {
                 "total_agents": len([r for r in agent_results.values() if r is not None]),
-                "successful_agents": len([r for r in agent_results.values() 
-                                        if r and r.get("status") == "success"]),
-                "failed_agents": len([r for r in agent_results.values() 
-                                    if r and r.get("status") == "error"])
+                "successful_agents": len(successful_agents),
+                "failed_agents": len(failed_agents),
+                "success_rate": f"{len(successful_agents)}/{len([r for r in agent_results.values() if r is not None])}"
             },
             "agent_results": {},
-            "insights": [],
-            "recommendations": []
+            "key_findings": [],
+            "formatted_summary": ""
         }
         
-        # Tổng hợp kết quả từng agent
+        # Tổng hợp kết quả từng agent với format đẹp
         for agent_name, result in agent_results.items():
             if result:
                 report["agent_results"][agent_name] = {
                     "status": result.get("status"),
-                    "summary": self._summarize_agent_result(result)
+                    "summary": self._summarize_agent_result(result),
+                    "key_data": self._extract_key_data(result)
                 }
         
-        # Tạo insights
-        report["insights"] = self._generate_insights(agent_results)
+        # Tạo key findings từ kết quả
+        report["key_findings"] = self._generate_key_findings(agent_results)
         
-        # Tạo recommendations
-        report["recommendations"] = self._generate_recommendations(agent_results)
+        # Tạo formatted summary
+        report["formatted_summary"] = self._create_formatted_summary(agent_results, user_input)
         
         return report
     
+    def _extract_key_data(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Trích xuất dữ liệu quan trọng từ kết quả agent"""
+        key_data = {
+            "data_type": "unknown",
+            "data_summary": "",
+            "metrics": {},
+            "files_created": []
+        }
+        
+        if result.get("status") != "success":
+            return key_data
+        
+        agent_name = result.get("agent", "unknown")
+        result_data = result.get("result", {})
+        
+        if agent_name == "query_agent":
+            if isinstance(result_data, dict) and "data" in result_data:
+                data_rows = result_data.get("data", [])
+                key_data["data_type"] = "database_query"
+                key_data["data_summary"] = f"Truy vấn trả về {len(data_rows)} bản ghi"
+                key_data["metrics"]["record_count"] = len(data_rows)
+            elif result.get("final_answer"):
+                key_data["data_type"] = "text_response"
+                key_data["data_summary"] = "Câu trả lời từ cơ sở dữ liệu"
+        
+        elif agent_name == "cv_agent":
+            if "cv_evaluations" in result_data:
+                cv_count = len(result_data.get("cv_evaluations", []))
+                key_data["data_type"] = "cv_analysis"
+                key_data["data_summary"] = f"Phân tích {cv_count} CV"
+                key_data["metrics"]["cv_count"] = cv_count
+                
+                # Tìm CV có điểm cao nhất
+                best_scores = []
+                for evaluation in result_data.get("cv_evaluations", []):
+                    if evaluation.get("best_match"):
+                        score = evaluation["best_match"].get("score", 0)
+                        best_scores.append(score)
+                
+                if best_scores:
+                    key_data["metrics"]["highest_score"] = max(best_scores)
+                    key_data["metrics"]["average_score"] = sum(best_scores) / len(best_scores)
+        
+        elif agent_name == "chart_agent":
+            if "chart_info" in result_data:
+                chart_info = result_data["chart_info"]
+                key_data["data_type"] = "chart_visualization"
+                key_data["data_summary"] = f"Tạo biểu đồ {chart_info.get('chart_type', 'unknown')}"
+                if chart_info.get("chart_file"):
+                    key_data["files_created"].append(chart_info["chart_file"])
+        
+        return key_data
+    
     def _summarize_agent_result(self, result: Dict[str, Any]) -> str:
-        """Tóm tắt kết quả của một agent"""
+        """Tóm tắt kết quả của một agent với thông tin chi tiết"""
         if result.get("status") == "success":
             agent_name = result.get("agent", "unknown")
+            key_data = self._extract_key_data(result)
+            
             if agent_name == "query_agent":
-                return "Truy vấn cơ sở dữ liệu thành công"
+                if key_data["metrics"].get("record_count"):
+                    return f"✅ Truy vấn thành công: {key_data['data_summary']}"
+                else:
+                    return "✅ Truy vấn cơ sở dữ liệu thành công"
             elif agent_name == "cv_agent":
-                return "Phân tích CV và ứng viên thành công"
+                if key_data["metrics"].get("cv_count"):
+                    return f"✅ Phân tích CV thành công: {key_data['data_summary']}"
+                else:
+                    return "✅ Phân tích CV và ứng viên thành công"
             elif agent_name == "chart_agent":
-                return "Tạo biểu đồ thành công"
+                if key_data["files_created"]:
+                    return f"✅ Tạo biểu đồ thành công: {key_data['data_summary']}"
+                else:
+                    return "✅ Tạo biểu đồ thành công"
             else:
-                return "Xử lý thành công"
+                return "✅ Xử lý thành công"
         elif result.get("status") == "error":
-            return f"Lỗi: {result.get('error', 'Unknown error')}"
+            return f"❌ Lỗi: {result.get('error', 'Unknown error')}"
         else:
-            return "Trạng thái không xác định"
+            return "⚠️ Trạng thái không xác định"
     
-    def _generate_recommendations(self, agent_results: Dict[str, Any]) -> List[str]:
-        """Tạo khuyến nghị dựa trên kết quả"""
-        recommendations = []
+    def _generate_key_findings(self, agent_results: Dict[str, Any]) -> List[str]:
+        """Tạo key findings từ kết quả các agent"""
+        findings = []
         
-        # Kiểm tra lỗi và đưa ra khuyến nghị
-        for agent_name, result in agent_results.items():
-            if result and result.get("status") == "error":
-                error = result.get("error", "")
-                if "quota" in error.lower() or "rate limit" in error.lower():
-                    recommendations.append("Giảm tần suất gọi API để tránh vượt quota")
-                elif "connection" in error.lower():
-                    recommendations.append("Kiểm tra kết nối mạng và cấu hình database")
-                elif "file not found" in error.lower():
-                    recommendations.append("Kiểm tra đường dẫn file và quyền truy cập")
-        
-        # Khuyến nghị dựa trên kết quả thành công
+        # Findings từ Query Agent
         query_result = agent_results.get("query_agent")
         if query_result and query_result.get("status") == "success":
-            recommendations.append("Có thể tạo biểu đồ để trực quan hóa dữ liệu query")
+            key_data = self._extract_key_data(query_result)
+            if key_data["metrics"].get("record_count"):
+                findings.append(f"📊 Truy vấn dữ liệu: Tìm thấy {key_data['metrics']['record_count']} bản ghi")
+            elif query_result.get("final_answer"):
+                findings.append("📊 Truy vấn dữ liệu: Có câu trả lời từ cơ sở dữ liệu")
         
+        # Findings từ CV Agent
         cv_result = agent_results.get("cv_agent")
         if cv_result and cv_result.get("status") == "success":
-            recommendations.append("Có thể so sánh thêm với các tiêu chí khác")
+            key_data = self._extract_key_data(cv_result)
+            if key_data["metrics"].get("cv_count"):
+                findings.append(f"👥 Phân tích CV: Đã đánh giá {key_data['metrics']['cv_count']} hồ sơ")
+                if key_data["metrics"].get("highest_score"):
+                    findings.append(f"⭐ Điểm cao nhất: {key_data['metrics']['highest_score']}%")
+                if key_data["metrics"].get("average_score"):
+                    findings.append(f"📈 Điểm trung bình: {key_data['metrics']['average_score']:.1f}%")
         
-        return recommendations
+        # Findings từ Chart Agent
+        chart_result = agent_results.get("chart_agent")
+        if chart_result and chart_result.get("status") == "success":
+            key_data = self._extract_key_data(chart_result)
+            if key_data["files_created"]:
+                findings.append(f"📈 Trực quan hóa: Đã tạo {len(key_data['files_created'])} biểu đồ")
+        
+        return findings
+    
+    def _create_formatted_summary(self, agent_results: Dict[str, Any], user_input: str) -> str:
+        """Tạo summary được format đẹp mắt"""
+        summary_parts = []
+        
+        # Header
+        summary_parts.append("## 📋 Báo Cáo Tổng Hợp")
+        summary_parts.append(f"**Yêu cầu:** {user_input}")
+        summary_parts.append(f"**Thời gian:** {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+        summary_parts.append("")
+        
+        # Execution Summary
+        successful_count = len([r for r in agent_results.values() if r and r.get("status") == "success"])
+        total_count = len([r for r in agent_results.values() if r is not None])
+        
+        summary_parts.append("### 🎯 Tóm Tắt Thực Hiện")
+        summary_parts.append(f"- **Tổng số agent:** {total_count}")
+        summary_parts.append(f"- **Thành công:** {successful_count}")
+        summary_parts.append(f"- **Tỷ lệ thành công:** {(successful_count/total_count*100):.1f}%" if total_count > 0 else "- **Tỷ lệ thành công:** 0%")
+        summary_parts.append("")
+        
+        # Key Findings
+        key_findings = self._generate_key_findings(agent_results)
+        if key_findings:
+            summary_parts.append("### 🔍 Phát Hiện Chính")
+            for finding in key_findings:
+                summary_parts.append(f"- {finding}")
+            summary_parts.append("")
+        
+        # Agent Results
+        summary_parts.append("### 📊 Kết Quả Chi Tiết")
+        for agent_name, result in agent_results.items():
+            if result:
+                status_icon = "✅" if result.get("status") == "success" else "❌" if result.get("status") == "error" else "⚠️"
+                agent_display_name = {
+                    "query_agent": "🔍 Query Agent",
+                    "cv_agent": "👥 CV Agent", 
+                    "chart_agent": "📈 Chart Agent",
+                    "analysis_agent": "🧠 Analysis Agent"
+                }.get(agent_name, f"🤖 {agent_name}")
+                
+                summary_parts.append(f"#### {status_icon} {agent_display_name}")
+                summary_parts.append(f"- **Trạng thái:** {self._summarize_agent_result(result)}")
+                
+                # Thêm thông tin chi tiết nếu có
+                key_data = self._extract_key_data(result)
+                if key_data["metrics"]:
+                    for metric, value in key_data["metrics"].items():
+                        summary_parts.append(f"- **{metric.replace('_', ' ').title()}:** {value}")
+                
+                if key_data["files_created"]:
+                    summary_parts.append(f"- **Files tạo:** {', '.join(key_data['files_created'])}")
+                
+                summary_parts.append("")
+        
+        return "\n".join(summary_parts)
     
     def _summarize_table_for_user(self, table_data: Dict[str, Any]) -> str:
         """Tạo tóm tắt bảng dữ liệu cho người dùng bằng LLM."""
@@ -425,110 +557,76 @@ Yêu cầu định dạng câu trả lời:
     
     async def process(self, user_input: str, agent_results: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Xử lý phân tích tổng hợp
+        Tổng hợp và trình bày kết quả từ các agent khác theo format đẹp
         """
         try:
-            print(f" Analysis Agent: Phân tích kết quả cho '{user_input}'")
-            print(f" Analysis Agent: Số lượng agent results: {len(agent_results) if agent_results else 0}")
+            print(f"🧠 Analysis Agent: Tổng hợp kết quả cho '{user_input}'")
+            print(f"🧠 Analysis Agent: Số lượng agent results: {len(agent_results) if agent_results else 0}")
             
             if not agent_results:
                 return {
                     "agent": "analysis_agent",
                     "status": "info",
                     "result": {
-                        "message": "Analysis Agent sẵn sàng phân tích kết quả",
-                        "usage": "Cung cấp kết quả từ các agent khác để phân tích"
+                        "message": "Analysis Agent sẵn sàng tổng hợp kết quả",
+                        "usage": "Cung cấp kết quả từ các agent khác để tổng hợp và trình bày",
+                        "capabilities": [
+                            "Tổng hợp kết quả từ Query Agent, CV Agent, Chart Agent",
+                            "Trình bày kết quả theo format đẹp mắt với emoji",
+                            "Tạo báo cáo tổng hợp chi tiết",
+                            "Phân tích và hiển thị key findings"
+                        ]
                     }
                 }
             
-            # Debug: In chi tiết từng agent result
-            for i, result in enumerate(agent_results):
-                print(f" Analysis Agent: Result {i}: agent={result.get('agent')}, status={result.get('status')}")
-                if result.get('agent') == 'query_agent':
-                    # Ưu tiên sử dụng final_answer từ QueryAgent
-                    if result.get('final_answer'):
-                        print(f" Analysis Agent: Query final_answer: {str(result['final_answer'])[:200]}...")
-                    elif result.get('result'):
-                        print(f" Analysis Agent: Query result type: {type(result['result'])}")
-                        print(f" Analysis Agent: Query result content: {str(result['result'])[:200]}...")
-                elif result.get('agent') == 'cv_agent':
-                    # Debug CV Agent results
-                    if result.get('result'):
-                        cv_result = result['result']
-                        print(f" Analysis Agent: CV Agent result type: {type(cv_result)}")
-                        if isinstance(cv_result, dict):
-                            print(f" Analysis Agent: CV Agent keys: {list(cv_result.keys())}")
-                            if 'cv_evaluations' in cv_result:
-                                cv_count = len(cv_result.get('cv_evaluations', []))
-                                print(f" Analysis Agent: CV Agent found {cv_count} CV evaluations")
-                                for j, evaluation in enumerate(cv_result.get('cv_evaluations', [])):
-                                    cv_name = evaluation.get('cv_name', 'Unknown')
-                                    status = evaluation.get('status', 'Unknown')
-                                    print(f" Analysis Agent: CV {j+1}: {cv_name} - {status}")
-                                    if evaluation.get('best_match'):
-                                        best_match = evaluation['best_match']
-                                        job_title = best_match.get('job_title', 'Unknown')
-                                        score = best_match.get('score', 0)
-                                        print(f" Analysis Agent: Best match: {job_title} ({score}%)")
-            
-            # Trích xuất kết quả từ các agent
+            # Trích xuất và phân loại kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
             
-            # Tạo báo cáo tổng hợp
+            # Tạo báo cáo tổng hợp với format đẹp
             summary_report = self._create_summary_report(extracted_results, user_input)
             
-            # Phân tích chất lượng dữ liệu nếu có
-            data_quality_analysis = None
-            for result in agent_results:
-                if result.get("status") == "success" and "result" in result:
-                    result_data = result["result"]
-                    if isinstance(result_data, dict) and "data" in result_data:
-                        data_quality_analysis = self._analyze_data_quality(result_data["data"])
+            # Tạo AI analysis nếu có dữ liệu
+            ai_analysis = ""
+            if self.ai_enabled:
+                # Tìm dữ liệu bảng để phân tích
+                first_table = None
+                for r in agent_results:
+                    if not r:
+                        continue
+                    res = r.get("result")
+                    if isinstance(res, dict) and res.get("columns") and res.get("data"):
+                        first_table = res
                         break
+                    elif isinstance(res, list) and res and all(isinstance(x, dict) for x in res):
+                        converted = self._list_of_dicts_to_table(res)
+                        if converted and converted.get("data"):
+                            first_table = converted
+                            break
+                
+                ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
             
-            # Tìm bảng dữ liệu đầu tiên để phân tích
-            first_table = None
-            for r in agent_results:
-                if not r:
-                    continue
-                res = r.get("result")
-                # Trường hợp đã chuẩn bảng
-                if isinstance(res, dict) and res.get("columns") and res.get("data"):
-                    first_table = res
-                    break
-                # Trường hợp là list[dict] (ví dụ từ Query Agent trả list-dict với Decimal)
-                if isinstance(res, list) and res and all(isinstance(x, dict) for x in res):
-                    converted = self._list_of_dicts_to_table(res)
-                    if converted and converted.get("data"):
-                        first_table = converted
-                        break
-            
-            # Phân tích bằng AI với dữ liệu bảng (nếu có)
-            ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
-
-            table_md = None
-            if first_table:
-                cols = first_table.get("columns", [])
-                rows = first_table.get("data", [])[:6]
-                # Render bảng nhỏ (6 dòng) để LLM tham chiếu
-                header = "| " + " | ".join([str(c) for c in cols]) + " |"
-                sep = "|" + "---|" * len(cols)
-                body = "\n".join(["| " + " | ".join([str(c) for c in r]) + " |" for r in rows])
-                table_md = "\n".join([header, sep, body])
-
-            # Sử dụng ai_analysis làm câu trả lời chính
-            markdown_summary = f"###  Trả lời\n{ai_analysis}"
+            # Tạo markdown summary đẹp mắt
+            markdown_summary = summary_report.get("formatted_summary", "")
+            if ai_analysis:
+                markdown_summary += f"\n\n### 🤖 Phân Tích AI\n{ai_analysis}"
 
             return {
                 "agent": "analysis_agent",
                 "status": "success",
                 "result": {
+                    "formatted_summary": markdown_summary,
                     "summary_report": summary_report,
-                    "data_quality_analysis": data_quality_analysis,
                     "ai_analysis": ai_analysis,
-                    "markdown": markdown_summary,
-                    "total_agents_processed": len([r for r in agent_results if r]),
-                    "success_rate": len([r for r in agent_results if r and r.get("status") == "success"]) / max(len(agent_results), 1)
+                    "key_findings": summary_report.get("key_findings", []),
+                    "execution_stats": {
+                        "total_agents": summary_report["execution_summary"]["total_agents"],
+                        "successful_agents": summary_report["execution_summary"]["successful_agents"],
+                        "success_rate": summary_report["execution_summary"]["success_rate"]
+                    },
+                    "agent_summaries": {
+                        agent_name: result.get("summary", "") 
+                        for agent_name, result in summary_report.get("agent_results", {}).items()
+                    }
                 }
             }
             
