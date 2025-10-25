@@ -146,6 +146,7 @@ Lưu ý đặc biệt:
                         "reasoning": "LLM response parsing failed, using fallback"
                     }
                 
+                print(f" Orchestrator: Execution plan: {result}")
                 return result
                 
             except json.JSONDecodeError as e:
