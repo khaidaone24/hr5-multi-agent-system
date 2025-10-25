@@ -395,7 +395,25 @@ class QueryAgent:
                     sal_idx = next(i for i,c in enumerate(cols) if "luong" in c)
                     name = data[0][name_idx]
                     sal = data[0][sal_idx]
-                    return f"Nhân viên có lương thấp nhất là {name} với mức lương {sal}."
+                    # Xác định context dựa trên cột dữ liệu
+                    if "phong_ban" in cols or "ten_phong_ban" in cols:
+                        return f"Phòng ban có lương trung bình thấp nhất là {name} với mức lương {sal:,.0f} VNĐ."
+                    else:
+                        return f"Nhân viên có lương thấp nhất là {name} với mức lương {sal:,.0f} VNĐ."
+                except Exception:
+                    pass
+            # Lương cao nhất
+            if any("luong" in c for c in cols) and any("ho_ten" == c or "ten" in c for c in cols) and len(data) >= 1:
+                try:
+                    name_idx = next(i for i,c in enumerate(cols) if c == "ho_ten" or "ten" in c)
+                    sal_idx = next(i for i,c in enumerate(cols) if "luong" in c)
+                    name = data[0][name_idx]
+                    sal = data[0][sal_idx]
+                    # Xác định context dựa trên cột dữ liệu
+                    if "phong_ban" in cols or "ten_phong_ban" in cols:
+                        return f"Phòng ban có lương trung bình cao nhất là {name} với mức lương {sal:,.0f} VNĐ."
+                    else:
+                        return f"Nhân viên có lương cao nhất là {name} với mức lương {sal:,.0f} VNĐ."
                 except Exception:
                     pass
             # Số lượng nhân viên theo phòng ban
