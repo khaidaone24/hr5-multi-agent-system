@@ -535,7 +535,26 @@ class AnalysisAgent:
                             print(f"    CV Agent answer length: {len(cv_agent_answer)}")
                         else:
                             print(f"    CV Agent result không có cv_evaluations hoặc không phải dict")
-                            cv_agent_answer = "CV Agent đã xử lý nhưng chưa có kết quả chi tiết"
+                            print(f"    CV Agent result content: {cv_result}")
+                            
+                            # Thử tìm dữ liệu CV trong cấu trúc khác
+                            if isinstance(cv_result, dict):
+                                # Kiểm tra các key có thể chứa dữ liệu CV
+                                possible_keys = ['cv_evaluations', 'evaluations', 'cv_data', 'results']
+                                found_data = False
+                                
+                                for key in possible_keys:
+                                    if key in cv_result and cv_result[key]:
+                                        print(f"    Tìm thấy dữ liệu CV trong key: {key}")
+                                        found_data = True
+                                        break
+                                
+                                if not found_data:
+                                    cv_agent_answer = f"CV Agent đã xử lý nhưng cấu trúc dữ liệu không mong đợi. Keys có sẵn: {list(cv_result.keys())}"
+                                else:
+                                    cv_agent_answer = "CV Agent đã xử lý nhưng chưa có kết quả chi tiết"
+                            else:
+                                cv_agent_answer = f"CV Agent đã xử lý nhưng kết quả không phải dict. Type: {type(cv_result)}"
             
             # Thêm thông tin về dữ liệu bảng nếu có
             table_summary = ""
@@ -657,15 +676,23 @@ Yêu cầu định dạng câu trả lời:
             print(f"🧠 Analysis Agent: Nhận được {len(agent_results)} kết quả từ orchestrator")
             for i, result in enumerate(agent_results):
                 print(f"  Result {i}: agent={result.get('agent')}, status={result.get('status')}")
+                print(f"    Result type: {type(result)}")
+                print(f"    Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not dict'}")
+                
                 if result.get('agent') == 'cv_agent':
                     cv_result = result.get('result', {})
-                    print(f"    CV Agent result keys: {list(cv_result.keys())}")
-                    if 'cv_evaluations' in cv_result:
+                    print(f"    CV Agent result type: {type(cv_result)}")
+                    print(f"    CV Agent result keys: {list(cv_result.keys()) if isinstance(cv_result, dict) else 'Not dict'}")
+                    
+                    if isinstance(cv_result, dict) and 'cv_evaluations' in cv_result:
                         cv_count = len(cv_result['cv_evaluations'])
                         print(f"    CV evaluations count: {cv_count}")
                         for j, evaluation in enumerate(cv_result['cv_evaluations']):
                             cv_name = evaluation.get('cv_name', f'CV_{j}')
                             print(f"      CV {j+1}: {cv_name}")
+                    else:
+                        print(f"    CV Agent result không có cv_evaluations hoặc không phải dict")
+                        print(f"    CV Agent result content: {cv_result}")
             
             # Trích xuất và phân loại kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
