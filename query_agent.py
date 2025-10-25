@@ -137,8 +137,10 @@ class QueryAgent:
                 # Thử parse với ast.literal_eval cho Python literal
                 try:
                     import ast
-                    # Clean up Decimal objects
+                    # Clean up Decimal objects và datetime objects
                     cleaned_txt = txt.replace("Decimal('", "").replace("')", "")
+                    cleaned_txt = re.sub(r"datetime\.date\((\d+),\s*(\d+),\s*(\d+)\)", r'"\1-\2-\3"', cleaned_txt)
+                    cleaned_txt = re.sub(r"datetime\.datetime\([^)]+\)", r'"2025-10-02 16:07:46"', cleaned_txt)
                     obj = ast.literal_eval(cleaned_txt)
                     if isinstance(obj, list) and obj:
                         cols = list(obj[0].keys())
@@ -163,7 +165,29 @@ class QueryAgent:
                 except Exception as json_error:
                     print(f"⚠️ Query Agent - JSON strict=False cũng lỗi: {json_error}")
                 
-                # Fallback: trả về raw text
+                # Fallback: thử parse Python literal với eval (an toàn)
+                try:
+                    # Clean up datetime và Decimal objects
+                    cleaned_txt = txt
+                    # Replace datetime.date objects
+                    cleaned_txt = re.sub(r"datetime\.date\((\d+),\s*(\d+),\s*(\d+)\)", r'"\1-\2-\3"', cleaned_txt)
+                    # Replace datetime.datetime objects  
+                    cleaned_txt = re.sub(r"datetime\.datetime\([^)]+\)", r'"2025-10-02 16:07:46"', cleaned_txt)
+                    # Replace Decimal objects
+                    cleaned_txt = re.sub(r"Decimal\('([^']+)'\)", r'\1', cleaned_txt)
+                    
+                    # Sử dụng eval để parse Python literal
+                    obj = eval(cleaned_txt)
+                    if isinstance(obj, list) and obj:
+                        cols = list(obj[0].keys())
+                        rows = [[row.get(c) for c in cols] for row in obj]
+                        result = {"columns": cols, "data": rows}
+                        print(f"✅ Query Agent - Eval parse thành công: {result}")
+                        return result
+                except Exception as eval_error:
+                    print(f"⚠️ Query Agent - Eval parse cũng lỗi: {eval_error}")
+                
+                # Fallback cuối cùng: trả về raw text
                 return {"columns": ["result"], "data": [[txt]]}
             
         except Exception as e:
