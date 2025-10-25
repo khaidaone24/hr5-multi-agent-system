@@ -490,14 +490,22 @@ class QueryAgent:
     async def initialize(self):
         """Khởi tạo MCP Client và Agent với Schema Awareness"""
         if self.client is None:
+            # Check if we're in Railway/production environment
+            if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('PORT'):
+                print(" Query Agent: Detected production environment - skipping MCP Client")
+                # In Railway, we skip MCP Client and use fallback mechanism
+                self.client = None
+                self.agent = None
+                # Initialize LLM for fallback
+                self.llm = ChatGoogleGenerativeAI(
+                    model="models/gemini-2.5-flash-lite",
+                    google_api_key=self.GEMINI_API_KEY,
+                    temperature=0.2,
+                )
+                return
+            
             try:
                 print(" Query Agent: Dang khoi tao MCP Client...")
-                
-                # Check if we're in Railway/production environment
-                if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('PORT'):
-                    print(" Query Agent: Detected production environment")
-                    # In production, we might need to handle MCP differently
-                    # For now, we'll try to initialize but gracefully handle failures
                 
                 # Kiểm tra MCPClient có method from_dict không
                 if hasattr(MCPClient, 'from_dict'):
