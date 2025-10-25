@@ -159,19 +159,25 @@ class AnalysisAgent:
         try:
             from chart_agent import ChartAgent
             chart_agent = ChartAgent()
+            logger.info(f"Creating donut chart for score: {score}, cv_name: {cv_name}")
+            
             result = chart_agent._create_donut_chart(
                 score, 
                 100 - score, 
                 f"Đánh Giá CV: {cv_name}"
             )
             
+            logger.info(f"Donut chart result: {result}")
+            
             if "chart_file" in result:
                 lines.append(f"![Donut Chart]({result['chart_file']})")
                 lines.append(f"*{result.get('title', 'Đánh giá phù hợp')}*")
+                logger.info(f"Donut chart created successfully: {result['chart_file']}")
             else:
+                logger.warning("No chart_file in result, using text chart")
                 lines.extend(self._create_text_chart(score))
         except Exception as e:
-            logger.warning(f"Failed to create donut chart: {e}")
+            logger.error(f"Failed to create donut chart: {e}")
             lines.extend(self._create_text_chart(score))
         
         lines.append("")
