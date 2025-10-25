@@ -141,35 +141,35 @@ class EnhancedCVAgent:
         retry_delay = 2
         
         for attempt in range(max_retries):
-        try:
-            prompt = f"""
+            try:
+                prompt = f"""
                 Phân tích CV và trả về JSON:
-            
+                
                 {cv_text[:3000]}
-            
+                
                 Format:
-            {{
+                {{
                     "name": "Tên",
-                "email": "Email",
+                    "email": "Email",
                     "phone": "SĐT",
                     "skills": ["skill1", "skill2"],
                     "experience_years": "X năm",
-                "education": "Học vấn",
+                    "education": "Học vấn",
                     "current_position": "Vị trí",
                     "summary": "Tóm tắt"
-            }}
-            """
-            
-            response = self.model.generate_content(prompt)
-            result_text = response.text
-            
-            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
-            else:
-                    raise ValueError("Không tìm thấy JSON trong response")
+                }}
+                """
                 
-        except Exception as e:
+                response = self.model.generate_content(prompt)
+                result_text = response.text
+                
+                json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group())
+                else:
+                    raise ValueError("Không tìm thấy JSON trong response")
+                    
+            except Exception as e:
                 if attempt < max_retries - 1:
                     logger.warning(f"Retry {attempt + 1}/{max_retries}: {e}")
                     await asyncio.sleep(retry_delay * (attempt + 1))
@@ -181,16 +181,16 @@ class EnhancedCVAgent:
     
     def _get_default_cv_info(self, error_msg: str) -> Dict[str, Any]:
         """Default CV info structure"""
-            return {
-                "name": "Unknown",
-                "email": "Unknown", 
-                "phone": "Unknown",
-                "skills": [],
-                "experience_years": "Unknown",
-                "education": "Unknown",
-                "current_position": "Unknown",
+        return {
+            "name": "Unknown",
+            "email": "Unknown", 
+            "phone": "Unknown",
+            "skills": [],
+            "experience_years": "Unknown",
+            "education": "Unknown",
+            "current_position": "Unknown",
             "summary": error_msg
-            }
+        }
     
     @_rate_limit_check
     async def _analyze_cv_with_ai(self, cv_text: str, user_input: str) -> str:
@@ -217,11 +217,11 @@ class EnhancedCVAgent:
     
     async def _process_uploaded_files(self, uploaded_files: List[str], user_input: str) -> Dict[str, Any]:
         """Process với validation và caching"""
-            results = []
-            
-            for filename in uploaded_files:
-                filepath = self.upload_dir / filename
-            
+        results = []
+        
+        for filename in uploaded_files:
+            filepath = self.upload_dir / filename
+        
             # Validate file
             is_valid, msg = self._validate_file(filepath)
             if not is_valid:
@@ -239,46 +239,46 @@ class EnhancedCVAgent:
             logger.info(f"Processing file {filename}")
             
             # Extract text
-                    cv_text = self._extract_text_from_pdf(str(filepath))
-                    if cv_text.startswith("Lỗi"):
+            cv_text = self._extract_text_from_pdf(str(filepath))
+            if cv_text.startswith("Lỗi"):
                 results.append({"filename": filename, "error": cv_text})
-                        continue
-                    
+                continue
+            
             # Extract info với rate limiting
             cv_info = await self._extract_cv_info(cv_text)
-                    
+            
             # AI analysis với rate limiting
-                    ai_analysis = await self._analyze_cv_with_ai(cv_text, user_input)
-                    
+            ai_analysis = await self._analyze_cv_with_ai(cv_text, user_input)
+            
             result = {
-                        "filename": filename,
-                        "cv_info": cv_info,
-                        "ai_analysis": ai_analysis,
-                        "text_length": len(cv_text)
+                "filename": filename,
+                "cv_info": cv_info,
+                "ai_analysis": ai_analysis,
+                "text_length": len(cv_text)
             }
             
             # Cache result
             self.cv_cache[file_hash] = result
             results.append(result)
-            
-            return {
-                "agent": "cv_agent",
-                "status": "success",
-                "result": {
-                    "uploaded_files_analysis": results,
-                    "total_files": len(uploaded_files),
+        
+        return {
+            "agent": "cv_agent",
+            "status": "success",
+            "result": {
+                "uploaded_files_analysis": results,
+                "total_files": len(uploaded_files),
                 "timestamp": time.time()
             }
-            }
+        }
     
     async def process(self, user_input: str, uploaded_files: List[str] = None) -> Dict[str, Any]:
         """Main processing method"""
         logger.info(f"Enhanced CV Agent: Processing request: {user_input}")
         
-            if uploaded_files:
+        if uploaded_files:
             logger.info(f"Processing {len(uploaded_files)} uploaded files")
-                return await self._process_uploaded_files(uploaded_files, user_input)
-            else:
+            return await self._process_uploaded_files(uploaded_files, user_input)
+        else:
             return {
                 "agent": "cv_agent",
                 "status": "error",
