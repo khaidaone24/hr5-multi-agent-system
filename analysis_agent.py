@@ -488,8 +488,13 @@ class AnalysisAgent:
                     # Xử lý CV Agent results - hiển thị đầy đủ
                     elif agent_name == "cv_agent" and result.get("result"):
                         cv_result = result["result"]
+                        print(f"    CV Agent result type: {type(cv_result)}")
+                        print(f"    CV Agent result keys: {list(cv_result.keys()) if isinstance(cv_result, dict) else 'Not dict'}")
+                        
                         if isinstance(cv_result, dict) and "cv_evaluations" in cv_result:
                             cv_evaluations = cv_result.get("cv_evaluations", [])
+                            print(f"    CV evaluations count: {len(cv_evaluations)}")
+                            
                             cv_summary = []
                             cv_summary.append(f"📋 **KẾT QUẢ PHÂN TÍCH CV CHI TIẾT**")
                             cv_summary.append(f"Tổng số CV đã phân tích: {len(cv_evaluations)}")
@@ -499,6 +504,8 @@ class AnalysisAgent:
                                 cv_name = evaluation.get("cv_name", f"CV_{i}")
                                 status = evaluation.get("status", "Unknown")
                                 
+                                print(f"      CV {i}: {cv_name} - {status}")
+                                
                                 cv_summary.append(f"**{i}. {cv_name}**")
                                 cv_summary.append(f"Trạng thái: {status}")
                                 
@@ -507,6 +514,8 @@ class AnalysisAgent:
                                     job_title = best_match.get("job_title", "Unknown")
                                     score = best_match.get("score", 0)
                                     analysis = best_match.get("analysis", "")
+                                    
+                                    print(f"        Best match: {job_title} ({score}%)")
                                     
                                     cv_summary.append(f"🎯 **Phù hợp nhất với:** {job_title}")
                                     cv_summary.append(f"⭐ **Điểm số:** {score}%")
@@ -523,6 +532,10 @@ class AnalysisAgent:
                                 cv_summary.append("")
                             
                             cv_agent_answer = "\n".join(cv_summary)
+                            print(f"    CV Agent answer length: {len(cv_agent_answer)}")
+                        else:
+                            print(f"    CV Agent result không có cv_evaluations hoặc không phải dict")
+                            cv_agent_answer = "CV Agent đã xử lý nhưng chưa có kết quả chi tiết"
             
             # Thêm thông tin về dữ liệu bảng nếu có
             table_summary = ""
@@ -555,6 +568,12 @@ HƯỚNG DẪN TRẢ LỜI:
 6. Nếu có dữ liệu bảng, nêu các điểm chính
 7. Thêm insights ngắn gọn nếu hữu ích
 8. VỚI CV RESULTS: Hiển thị từng CV với đầy đủ thông tin đánh giá
+
+QUAN TRỌNG:
+- CHỈ sử dụng dữ liệu thật từ kết quả agent, KHÔNG tạo dữ liệu giả lập
+- Nếu không có dữ liệu cụ thể, hãy nói rõ "Chưa có dữ liệu cụ thể"
+- KHÔNG được bịa đặt thông tin cá nhân như tên, email, số điện thoại
+- CHỈ hiển thị thông tin có trong kết quả agent
 
 VÍ DỤ:
 - Người dùng hỏi: "Có bao nhiêu nhân viên?"
