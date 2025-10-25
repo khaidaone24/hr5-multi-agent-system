@@ -294,7 +294,7 @@ class AnalysisAgent:
                 table_summary = self._summarize_table_for_user(first_table_data)
 
             prompt = f"""
-Bạn là một chuyên gia phân tích dữ liệu HR. Hãy phân tích kết quả từ các agent AI và đưa ra câu trả lời trực tiếp, thân thiện với người dùng.
+Bạn là một chuyên gia phân tích dữ liệu HR. Hãy trả lời câu hỏi của người dùng một cách tự nhiên và hữu ích.
 
 Yêu cầu người dùng: {user_input}
 
@@ -304,12 +304,19 @@ Kết quả từ các agent:
 Dữ liệu chính được truy vấn (nếu có):
 {table_summary}
 
-Hãy đưa ra:
-1. Một câu trả lời trực tiếp, ngắn gọn, thân thiện với người dùng, tóm tắt kết quả chính (ví dụ: "Dựa trên yêu cầu của bạn, đây là thông tin về X: ...").
-2. Nếu có dữ liệu bảng, hãy nêu bật các điểm chính từ bảng (ví dụ: "Phòng ban có số lượng nhân viên cao nhất là...", "Mức lương trung bình cao nhất là...").
-3. Bất kỳ khuyến nghị hoặc bước tiếp theo nào có thể hữu ích.
+HƯỚNG DẪN TRẢ LỜI:
+1. Trả lời TRỰC TIẾP câu hỏi của người dùng (ví dụ: "Công ty có 25 nhân viên")
+2. Sử dụng dữ liệu cụ thể từ kết quả
+3. Trả lời tự nhiên như đang nói chuyện
+4. Nếu có dữ liệu bảng, nêu các điểm chính (phòng ban nào có nhiều nhân viên nhất, etc.)
+5. Thêm insights ngắn gọn nếu hữu ích
 
-Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đẹp (ví dụ: dùng **bold**, *italic*, list).
+VÍ DỤ:
+- Người dùng hỏi: "Có bao nhiêu nhân viên?"
+- Dữ liệu: [{'count': 25}]
+- Trả lời: "Công ty hiện có **25 nhân viên**. Đây là tổng số nhân viên đang làm việc tại công ty."
+
+Trả lời bằng tiếng Việt, sử dụng Markdown để định dạng đẹp.
 """
             
             response = await llm.ainvoke(prompt)
