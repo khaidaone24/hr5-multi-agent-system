@@ -641,7 +641,7 @@ Yêu cầu định dạng câu trả lời:
                 if result.get('agent') == 'cv_agent':
                     cv_result = result.get('result', {})
                     print(f"    CV Agent result keys: {list(cv_result.keys())}")
-                            if 'cv_evaluations' in cv_result:
+                    if 'cv_evaluations' in cv_result:
                         cv_count = len(cv_result['cv_evaluations'])
                         print(f"    CV evaluations count: {cv_count}")
                         for j, evaluation in enumerate(cv_result['cv_evaluations']):
@@ -658,19 +658,19 @@ Yêu cầu định dạng câu trả lời:
             ai_analysis = ""
             if self.ai_enabled:
                 # Tìm dữ liệu bảng để phân tích
-            first_table = None
-            for r in agent_results:
-                if not r:
-                    continue
-                res = r.get("result")
-                if isinstance(res, dict) and res.get("columns") and res.get("data"):
-                    first_table = res
-                    break
-                    elif isinstance(res, list) and res and all(isinstance(x, dict) for x in res):
-                    converted = self._list_of_dicts_to_table(res)
-                    if converted and converted.get("data"):
-                        first_table = converted
+                first_table = None
+                for r in agent_results:
+                    if not r:
+                        continue
+                    res = r.get("result")
+                    if isinstance(res, dict) and res.get("columns") and res.get("data"):
+                        first_table = res
                         break
+                    elif isinstance(res, list) and res and all(isinstance(x, dict) for x in res):
+                        converted = self._list_of_dicts_to_table(res)
+                        if converted and converted.get("data"):
+                            first_table = converted
+                            break
             
             ai_analysis = await self._ai_analysis(user_input, extracted_results, first_table)
 
