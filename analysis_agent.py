@@ -307,7 +307,7 @@ class AnalysisAgent:
         if result.get("status") != "success":
             return key_data
         
-            agent_name = result.get("agent", "unknown")
+        agent_name = result.get("agent", "unknown")
         result_data = result.get("result", {})
         
         if agent_name == "cv_agent":
@@ -320,7 +320,7 @@ class AnalysisAgent:
                 "successful_analysis": len([e for e in cv_evaluations if e.get("status") == "success"])
             }
         
-            elif agent_name == "chart_agent":
+        elif agent_name == "chart_agent":
             key_data["data_type"] = "chart_creation"
             key_data["data_summary"] = result_data.get("summary", "Tạo biểu đồ")
             key_data["files_created"] = result_data.get("files_created", [])
