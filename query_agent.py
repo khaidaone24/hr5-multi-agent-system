@@ -41,20 +41,21 @@ class QueryAgent:
             print(" Query Agent: Railway environment detected - using direct DB connection")
             self.config = None  # Will use direct PostgreSQL connection
         else:
-            self.config = {
-                "mcpServers": {
-                    "postgres": {
-                        "command": "python",
-                        "args": [
-                            "-m", "mcp.server.postgres",
-                            "--access-mode=unrestricted",
-                        ],
-                        "env": {
-                            "DATABASE_URI": self.DB_LINK
-                        },
+                self.config = {
+                    "mcpServers": {
+                        "postgres": {
+                            "command": "uv",
+                            "args": [
+                                "run",
+                                "postgres-mcp",
+                                "--access-mode=unrestricted",
+                            ],
+                            "env": {
+                                "DATABASE_URI": self.DB_LINK
+                            },
+                        }
                     }
                 }
-            }
         
         # Initialize schema-related attributes
         self.schema_details = {}

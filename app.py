@@ -54,6 +54,11 @@ def health_check():
         "version": "1.0.0"
     })
 
+@app.route('/health')
+def health():
+    """Health check endpoint for Docker"""
+    return "OK", 200
+
 @app.route('/api/process', methods=['POST'])
 def process_request():
     """Xử lý yêu cầu từ người dùng"""
