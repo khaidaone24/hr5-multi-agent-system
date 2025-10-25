@@ -1,8 +1,11 @@
 import json
 import logging
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from pathlib import Path
+from langchain_google_genai import ChatGoogleGenerativeAI
+from dotenv import load_dotenv
 
 # Setup logging
 logging.basicConfig(
@@ -17,6 +20,8 @@ class AnalysisAgent:
     def __init__(self):
         self.agent_name = "analysis_agent"
         self.llm_model = "models/gemini-2.5-flash-lite"
+        load_dotenv()
+        self.GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
         logger.info("Analysis Agent initialized with refactored structure")
     
     def _format_cv_evaluation(self, evaluation: Dict[str, Any], index: int) -> List[str]:
@@ -350,8 +355,8 @@ class AnalysisAgent:
         
         return findings
     
-    def _generate_query_analysis(self, agent_results_dict: Dict[str, Any]) -> str:
-        """Tạo phân tích thân thiện cho query results"""
+    async def _generate_llm_query_analysis(self, agent_results_dict: Dict[str, Any], user_input: str) -> str:
+        """Tạo phân tích thân thiện cho query results bằng LLM"""
         query_result = agent_results_dict.get("query_agent")
         if not query_result or query_result.get("status") != "success":
             return ""
@@ -363,110 +368,60 @@ class AnalysisAgent:
         # Lấy dữ liệu từ query result
         columns = result_data.get("columns", [])
         data = result_data.get("data", [])
+        raw_sql = result_data.get("raw_result", "")
         
         if not data or not columns:
             return ""
         
-        # Xử lý dữ liệu phòng ban
-        if "phong_ban" in str(result_data.get("raw_result", "")).lower():
-            return self._format_phong_ban_analysis(data)
-        
-        # Xử lý dữ liệu nhân viên
-        elif "nhan_vien" in str(result_data.get("raw_result", "")).lower():
-            return self._format_nhan_vien_analysis(data)
-        
-        # Xử lý dữ liệu chung
-        else:
-            return self._format_general_analysis(columns, data)
-    
-    def _format_phong_ban_analysis(self, data: List[List]) -> str:
-        """Format phân tích phòng ban"""
-        if not data or not data[0]:
-            return ""
-        
         try:
-            # Parse dữ liệu phòng ban từ string
-            import ast
-            phong_ban_data = ast.literal_eval(data[0][0])
+            # Khởi tạo LLM
+            llm = ChatGoogleGenerativeAI(
+                model=self.llm_model,
+                google_api_key=self.GEMINI_API_KEY,
+                temperature=0.3,
+            )
             
-            if not isinstance(phong_ban_data, list):
-                return ""
+            # Chuẩn bị dữ liệu cho LLM
+            data_sample = data[:10] if len(data) > 10 else data  # Chỉ lấy 10 dòng đầu để tiết kiệm token
             
-            analysis = "### 🏢 Danh Sách Phòng Ban\n\n"
+            prompt = f"""
+Bạn là một AI Assistant chuyên chuyển đổi dữ liệu SQL thành ngôn ngữ thân thiện với người dùng.
+
+Yêu cầu của người dùng: "{user_input}"
+SQL đã thực thi: {raw_sql}
+Các cột dữ liệu: {columns}
+Dữ liệu trả về: {data_sample}
+Tổng số bản ghi: {len(data)}
+
+Hãy tạo một phân tích thân thiện với người dùng theo format markdown:
+
+1. **Tiêu đề phù hợp** với yêu cầu người dùng
+2. **Danh sách dữ liệu** được format đẹp mắt với emoji
+3. **Thống kê tổng kết** ở cuối
+4. **Ngôn ngữ tiếng Việt**, thân thiện, dễ hiểu
+5. **Sử dụng emoji** để làm cho nội dung sinh động
+6. **Không hiển thị raw data** mà chuyển thành thông tin có ý nghĩa
+
+Ví dụ format:
+### 🏢 Danh Sách Phòng Ban
+
+**Phòng Nhân sự** (PB01)
+- 📝 Mô tả: Quản lý nhân sự và tuyển dụng  
+- 📅 Ngày thành lập: 2010-01-01
+- ✅ Trạng thái: Đang hoạt động
+
+**📊 Tổng kết:** Có 3 phòng ban đang hoạt động trong hệ thống.
+
+Chỉ trả về markdown, không cần giải thích thêm.
+"""
             
-            for pb in phong_ban_data:
-                if isinstance(pb, dict):
-                    ten_pb = pb.get("ten_phong_ban", "N/A")
-                    ma_pb = pb.get("ma_phong_ban", "N/A")
-                    mo_ta = pb.get("mo_ta", "Không có mô tả")
-                    ngay_tl = pb.get("ngay_thanh_lap", "N/A")
-                    trang_thai = pb.get("trang_thai", "N/A")
-                    
-                    analysis += f"**{ten_pb}** ({ma_pb})\n"
-                    analysis += f"- 📝 Mô tả: {mo_ta}\n"
-                    analysis += f"- 📅 Ngày thành lập: {ngay_tl}\n"
-                    analysis += f"- ✅ Trạng thái: {trang_thai}\n\n"
-            
-            analysis += f"**📊 Tổng kết:** Có {len(phong_ban_data)} phòng ban đang hoạt động trong hệ thống."
-            return analysis
+            response = await llm.ainvoke(prompt)
+            return response.content if hasattr(response, 'content') else str(response)
             
         except Exception as e:
-            logger.error(f"Error formatting phong ban analysis: {e}")
-            return f"### 🏢 Danh Sách Phòng Ban\n\nĐã truy vấn thành công dữ liệu phòng ban. Có {len(data)} bản ghi được trả về."
+            logger.error(f"Error generating LLM query analysis: {e}")
+            return f"### 📊 Kết Quả Truy Vấn\n\nĐã truy vấn thành công. Có {len(data)} bản ghi được trả về."
     
-    def _format_nhan_vien_analysis(self, data: List[List]) -> str:
-        """Format phân tích nhân viên"""
-        if not data or not data[0]:
-            return ""
-        
-        try:
-            import ast
-            nhan_vien_data = ast.literal_eval(data[0][0])
-            
-            if not isinstance(nhan_vien_data, list):
-                return ""
-            
-            analysis = "### 👥 Danh Sách Nhân Viên\n\n"
-            
-            for nv in nhan_vien_data[:10]:  # Chỉ hiển thị 10 nhân viên đầu
-                if isinstance(nv, dict):
-                    ho_ten = nv.get("ho_ten", "N/A")
-                    ma_nv = nv.get("ma_nhan_vien", "N/A")
-                    email = nv.get("email", "N/A")
-                    trang_thai = nv.get("trang_thai", "N/A")
-                    
-                    analysis += f"**{ho_ten}** ({ma_nv})\n"
-                    analysis += f"- 📧 Email: {email}\n"
-                    analysis += f"- ✅ Trạng thái: {trang_thai}\n\n"
-            
-            if len(nhan_vien_data) > 10:
-                analysis += f"... và {len(nhan_vien_data) - 10} nhân viên khác\n\n"
-            
-            analysis += f"**📊 Tổng kết:** Có {len(nhan_vien_data)} nhân viên trong hệ thống."
-            return analysis
-            
-        except Exception as e:
-            logger.error(f"Error formatting nhan vien analysis: {e}")
-            return f"### 👥 Danh Sách Nhân Viên\n\nĐã truy vấn thành công dữ liệu nhân viên. Có {len(data)} bản ghi được trả về."
-    
-    def _format_general_analysis(self, columns: List[str], data: List[List]) -> str:
-        """Format phân tích dữ liệu chung"""
-        if not data:
-            return ""
-        
-        analysis = "### 📊 Kết Quả Truy Vấn\n\n"
-        analysis += f"**Các cột dữ liệu:** {', '.join(columns)}\n\n"
-        analysis += f"**Số bản ghi:** {len(data)}\n\n"
-        
-        if data and len(data[0]) > 0:
-            analysis += "**Dữ liệu mẫu:**\n"
-            for i, row in enumerate(data[:5]):  # Hiển thị 5 dòng đầu
-                analysis += f"{i+1}. {row[0] if row else 'N/A'}\n"
-            
-            if len(data) > 5:
-                analysis += f"... và {len(data) - 5} bản ghi khác\n"
-        
-        return analysis
     
     def _summarize_agent_result(self, result: Dict[str, Any]) -> str:
         """Tóm tắt kết quả agent"""
@@ -499,8 +454,8 @@ class AnalysisAgent:
         # Create summary report
         summary_report = self._create_summary_report(agent_results_dict, user_input)
         
-        # Tạo AI analysis cho query results
-        ai_analysis = self._generate_query_analysis(agent_results_dict)
+        # Tạo AI analysis cho query results bằng LLM
+        ai_analysis = await self._generate_llm_query_analysis(agent_results_dict, user_input)
         
         # Tạo markdown summary đẹp mắt
         markdown_summary = summary_report.get("formatted_summary", "")
