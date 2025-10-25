@@ -680,7 +680,7 @@ Chỉ trả về định dạng JSON này:
             print(f" CV Agent: So sánh {len(cv_filenames)} CV với job requirements")
             
             # Đọc job requirements
-            job_requirements = self._read_job_requirements()
+            job_requirements = self._load_job_requirements()
             if not job_requirements:
                 return {
                     "agent": "cv_agent",
