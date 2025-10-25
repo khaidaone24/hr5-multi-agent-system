@@ -184,7 +184,7 @@ class CVAgent:
         return cv_data
     
     def compare_cv_job_with_gemini(self, cv_text: str, job_text: str, cv_key_info: Optional[Dict] = None) -> tuple:
-        """So sánh CV với yêu cầu công việc bằng Gemini AI"""
+        """So sánh CV với yêu cầu công việc bằng Gemini AI - phân tích chi tiết từng tiêu chí"""
         
         # Prepare structured prompt
         key_info_str = ""
@@ -207,17 +207,41 @@ KEY CANDIDATE INFO:
 === JOB REQUIREMENTS ===
 {job_text[:2000]}
 
-Evaluate the match (0-100) based on:
-1. Technical/functional skills alignment
-2. Years of experience match
-3. Educational qualification
-4. Industry/domain experience
-5. Cultural fit indicators
+Evaluate the match (0-100) based on these specific criteria:
+1. Job Title/Role alignment (Chức danh)
+2. Skills match (Kỹ năng) 
+3. Experience level (Kinh nghiệm)
+4. Education background (Học vấn)
+
+For each criteria, provide:
+- Score (0-100)
+- Detailed analysis
+- Strengths and weaknesses
 
 Return ONLY this JSON format:
 {{
-    "match_score": <integer 0-100>,
-    "summary": "<2-3 sentences explaining the score>"
+    "overall_score": <integer 0-100>,
+    "detailed_scores": {{
+        "job_title": {{
+            "score": <integer 0-100>,
+            "analysis": "<detailed analysis>"
+        }},
+        "skills": {{
+            "score": <integer 0-100>,
+            "analysis": "<detailed analysis>"
+        }},
+        "experience": {{
+            "score": <integer 0-100>,
+            "analysis": "<detailed analysis>"
+        }},
+        "education": {{
+            "score": <integer 0-100>,
+            "analysis": "<detailed analysis>"
+        }}
+    }},
+    "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+    "weaknesses": ["<weakness 1>", "<weakness 2>", "<weakness 3>"],
+    "summary": "<2-3 sentences explaining the overall score>"
 }}
 """
         
@@ -262,18 +286,18 @@ Return ONLY this JSON format:
                 result_text = result_text.split("```")[1].split("```")[0].strip()
             
             result = json.loads(result_text)
-            return result.get("match_score", 0), result.get("summary", "")
+            return result.get("overall_score", 0), result.get("summary", ""), result
             
         except Exception as e:
             error_msg = str(e)
             
-            if "429" in error_msg or "quota" in error_msg.lower():
-                print(f" Rate limit hit! Waiting 60 seconds...")
-                time.sleep(60)
-                return 0, f"Rate limit exceeded. Please wait and try again."
+            if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                print(f" 🚨 RATE LIMIT HIT! Dừng phân tích ngay lập tức...")
+                print(f" 🚨 Lỗi: {error_msg[:100]}")
+                return 0, f"Rate limit exceeded. Hệ thống đã dừng phân tích để tránh lỗi API.", {}
             else:
                 print(f" Gemini error: {error_msg[:100]}")
-                return 0, f"API Error: {error_msg[:100]}"
+                return 0, f"API Error: {error_msg[:100]}", {}
     
     async def process(self, user_input: str, uploaded_files: List[str] = None) -> Dict[str, Any]:
         """
@@ -463,22 +487,75 @@ Return ONLY this JSON format:
                 """
                 
                 try:
-                    # Sử dụng Gemini để đánh giá
-                    score, analysis = self.compare_cv_job_with_gemini(cv_text, job_text, cv_key_info)
+                    # Sử dụng Gemini để đánh giá với phân tích chi tiết
+                    score, analysis, detailed_result = self.compare_cv_job_with_gemini(cv_text, job_text, cv_key_info)
                     print(f" CV Agent: Kết quả đánh giá {job_title}: {score}%")
                     
-                    evaluations.append({
+                    # Kiểm tra rate limit
+                    if "Rate limit exceeded" in analysis:
+                        print(f" CV Agent: Rate limit hit! Dừng phân tích...")
+                        return {
+                            "cv_name": Path(cv_path).name,
+                            "status": "error",
+                            "error": "Rate limit exceeded. Vui lòng thử lại sau.",
+                            "cv_key_info": cv_key_info
+                        }
+                    
+                    # Tạo kết quả đánh giá
+                    evaluation_result = {
                         "job_title": job_title,
                         "score": score,
                         "analysis": analysis,
+                        "detailed_scores": detailed_result.get("detailed_scores", {}),
+                        "strengths": detailed_result.get("strengths", []),
+                        "weaknesses": detailed_result.get("weaknesses", []),
                         "cv_key_info": cv_key_info
-                    })
+                    }
+                    
+                    evaluations.append(evaluation_result)
+                    
+                    # Hiển thị kết quả realtime
+                    print(f"\n{'='*60}")
+                    print(f"📊 KẾT QUẢ PHÂN TÍCH REALTIME")
+                    print(f"{'='*60}")
+                    print(f"👤 CV: {Path(cv_path).name}")
+                    print(f"💼 Job: {job_title}")
+                    print(f"⭐ Điểm số: {score}%")
+                    print(f"📝 Phân tích: {analysis}")
+                    
+                    # Hiển thị điểm chi tiết
+                    if detailed_result.get("detailed_scores"):
+                        print(f"\n📊 Phân tích chi tiết:")
+                        for criteria, data in detailed_result["detailed_scores"].items():
+                            criteria_name = {
+                                "job_title": "Chức danh",
+                                "skills": "Kỹ năng", 
+                                "experience": "Kinh nghiệm",
+                                "education": "Học vấn"
+                            }.get(criteria, criteria)
+                            print(f"  - {criteria_name}: {data.get('score', 0)}%")
+                    
+                    # Hiển thị điểm mạnh/yếu
+                    if detailed_result.get("strengths"):
+                        print(f"\n✅ Điểm mạnh:")
+                        for strength in detailed_result["strengths"][:3]:  # Chỉ hiển thị 3 điểm mạnh đầu
+                            print(f"  + {strength}")
+                    
+                    if detailed_result.get("weaknesses"):
+                        print(f"\n❌ Điểm cần cải thiện:")
+                        for weakness in detailed_result["weaknesses"][:3]:  # Chỉ hiển thị 3 điểm yếu đầu
+                            print(f"  - {weakness}")
+                    
+                    print(f"{'='*60}\n")
                 except Exception as e:
                     print(f" CV Agent: Lỗi đánh giá {job_title}: {e}")
                     evaluations.append({
                         "job_title": job_title,
                         "score": 0,
                         "analysis": f"Lỗi đánh giá: {str(e)}",
+                        "detailed_scores": {},
+                        "strengths": [],
+                        "weaknesses": [],
                         "cv_key_info": cv_key_info
                     })
             

@@ -572,6 +572,67 @@ Chọn loại biểu đồ phù hợp nhất với yêu cầu và dữ liệu.
         except Exception as e:
             return {"error": f"Lỗi tạo biểu đồ tròn: {str(e)}"}
     
+    def _create_donut_chart(self, suitable_percent: float, unsuitable_percent: float, title: str = "Đánh Giá Phù Hợp CV") -> Dict[str, Any]:
+        """Tạo biểu đồ donut cho kết quả CV"""
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            # Dữ liệu
+            labels = ['Phù hợp', 'Không phù hợp']
+            sizes = [suitable_percent, unsuitable_percent]
+            colors = ['#ff4444', '#44ff44']  # Đỏ cho phù hợp, xanh cho không phù hợp
+            explode = (0.05, 0.05)  # Tách nhẹ các phần
+            
+            # Tạo figure
+            fig, ax = plt.subplots(figsize=(10, 8))
+            
+            # Tạo donut chart
+            wedges, texts, autotexts = ax.pie(
+                sizes, 
+                labels=labels,
+                colors=colors,
+                autopct='%1.1f%%',
+                startangle=90,
+                explode=explode,
+                pctdistance=0.85,
+                textprops={'fontsize': 12, 'weight': 'bold'}
+            )
+            
+            # Tạo lỗ ở giữa để tạo donut
+            centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+            ax.add_artist(centre_circle)
+            
+            # Thêm tổng điểm ở giữa
+            total_score = suitable_percent
+            ax.text(0, 0, f'{total_score}%\nTỔNG ĐIỂM', 
+                   ha='center', va='center', fontsize=16, fontweight='bold')
+            
+            # Cấu hình
+            ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+            
+            # Lưu biểu đồ
+            chart_filename = f"donut_chart_{int(suitable_percent)}_{int(unsuitable_percent)}.png"
+            chart_path = self.chart_dir / chart_filename
+            plt.savefig(chart_path, dpi=300, bbox_inches='tight', facecolor='white')
+            plt.close()
+            
+            return {
+                "chart_type": "donut",
+                "chart_file": str(chart_path),
+                "chart_filename": chart_filename,
+                "title": title,
+                "data": {
+                    "suitable_percent": suitable_percent,
+                    "unsuitable_percent": unsuitable_percent,
+                    "total_score": total_score
+                }
+            }
+            
+        except Exception as e:
+            return {"error": f"Lỗi tạo biểu đồ donut: {str(e)}"}
+    
     def _create_line_chart(self, data_rows: List[List], x_idx: int, y_idx: int, title: str, user_input: str) -> Dict[str, Any]:
         """Tạo biểu đồ đường"""
         try:

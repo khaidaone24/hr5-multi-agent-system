@@ -401,16 +401,24 @@ class AnalysisAgent:
                 if key_data["files_created"]:
                     summary_parts.append(f"- **Files tạo:** {', '.join(key_data['files_created'])}")
                 
-                # Hiển thị full CV data nếu có
+                # Hiển thị full CV data với format đẹp như dashboard
                 if agent_name == "cv_agent" and key_data.get("full_cv_data"):
                     summary_parts.append("")
-                    summary_parts.append("##### 📋 Chi Tiết Đánh Giá CV")
+                    summary_parts.append("##### 📋 Báo Cáo Đánh Giá Ứng Viên")
+                    
                     for i, evaluation in enumerate(key_data["full_cv_data"], 1):
                         cv_name = evaluation.get("cv_name", f"CV_{i}")
                         status = evaluation.get("status", "Unknown")
+                        cv_key_info = evaluation.get("cv_key_info", {})
                         
-                        summary_parts.append(f"**{i}. {cv_name}**")
+                        # Thông tin ứng viên
+                        summary_parts.append(f"**👤 Thông tin ứng viên: {cv_name}**")
                         summary_parts.append(f"- **Trạng thái:** {status}")
+                        if cv_key_info.get("experience_years"):
+                            summary_parts.append(f"- **Kinh nghiệm:** {cv_key_info.get('experience_years')} năm")
+                        if cv_key_info.get("skills"):
+                            summary_parts.append(f"- **Kỹ năng:** {', '.join(cv_key_info.get('skills', [])[:5])}")
+                        summary_parts.append("")
                         
                         if evaluation.get("best_match"):
                             best_match = evaluation["best_match"]
@@ -418,17 +426,101 @@ class AnalysisAgent:
                             score = best_match.get("score", 0)
                             analysis = best_match.get("analysis", "")
                             
-                            summary_parts.append(f"- **Phù hợp nhất với:** {job_title}")
-                            summary_parts.append(f"- **Điểm số:** {score}%")
-                            summary_parts.append(f"- **Phân tích:** {analysis}")
+                            # Điểm tổng thể với màu sắc
+                            score_color = "🟢" if score >= 70 else "🟡" if score >= 50 else "🔴"
+                            summary_parts.append(f"**🎯 Xếp hạng và đánh giá bởi AI (beta)**")
+                            summary_parts.append(f"**Điểm tổng thể: {score_color} {score}%**")
+                            summary_parts.append("")
+                            
+                            # Phân tích chi tiết từng tiêu chí
+                            if best_match.get("detailed_scores"):
+                                detailed_scores = best_match["detailed_scores"]
+                                summary_parts.append("**📊 Phân tích chi tiết:**")
+                                
+                                # Job Title
+                                if "job_title" in detailed_scores:
+                                    job_score = detailed_scores["job_title"].get("score", 0)
+                                    job_analysis = detailed_scores["job_title"].get("analysis", "")
+                                    summary_parts.append(f"- **Chức danh ({job_score}%):** {job_analysis}")
+                                
+                                # Skills
+                                if "skills" in detailed_scores:
+                                    skills_score = detailed_scores["skills"].get("score", 0)
+                                    skills_analysis = detailed_scores["skills"].get("analysis", "")
+                                    summary_parts.append(f"- **Kỹ năng ({skills_score}%):** {skills_analysis}")
+                                
+                                # Experience
+                                if "experience" in detailed_scores:
+                                    exp_score = detailed_scores["experience"].get("score", 0)
+                                    exp_analysis = detailed_scores["experience"].get("analysis", "")
+                                    summary_parts.append(f"- **Kinh nghiệm ({exp_score}%):** {exp_analysis}")
+                                
+                                # Education
+                                if "education" in detailed_scores:
+                                    edu_score = detailed_scores["education"].get("score", 0)
+                                    edu_analysis = detailed_scores["education"].get("analysis", "")
+                                    summary_parts.append(f"- **Học vấn ({edu_score}%):** {edu_analysis}")
+                                
+                                summary_parts.append("")
+                            
+                            # Điểm mạnh và điểm yếu
+                            if best_match.get("strengths"):
+                                summary_parts.append("**✅ Điểm mạnh:**")
+                                for strength in best_match["strengths"]:
+                                    summary_parts.append(f"- {strength}")
+                                summary_parts.append("")
+                            
+                            if best_match.get("weaknesses"):
+                                summary_parts.append("**❌ Điểm cần cải thiện:**")
+                                for weakness in best_match["weaknesses"]:
+                                    summary_parts.append(f"- {weakness}")
+                                summary_parts.append("")
+                            
+                            # Tạo biểu đồ donut chart thật
+                            summary_parts.append("**📈 Biểu đồ đánh giá:**")
+                            suitable_percent = score
+                            unsuitable_percent = 100 - score
+                            
+                            # Tạo donut chart thật bằng Chart Agent
+                            try:
+                                from chart_agent import ChartAgent
+                                chart_agent = ChartAgent()
+                                donut_result = chart_agent._create_donut_chart(
+                                    suitable_percent, 
+                                    unsuitable_percent, 
+                                    f"Đánh Giá CV: {cv_name}"
+                                )
+                                
+                                if "chart_file" in donut_result:
+                                    chart_file = donut_result["chart_file"]
+                                    summary_parts.append(f"![Donut Chart]({chart_file})")
+                                    summary_parts.append(f"*Biểu đồ: {donut_result.get('title', 'Đánh giá phù hợp')}*")
+                                else:
+                                    # Fallback to text chart
+                                    summary_parts.append("```")
+                                    summary_parts.append(f"🔴 Phù hợp: {suitable_percent}%")
+                                    summary_parts.append(f"🟢 Không phù hợp: {unsuitable_percent}%")
+                                    summary_parts.append("```")
+                            except Exception as e:
+                                # Fallback to text chart nếu có lỗi
+                                summary_parts.append("```")
+                                summary_parts.append(f"🔴 Phù hợp: {suitable_percent}%")
+                                summary_parts.append(f"🟢 Không phù hợp: {unsuitable_percent}%")
+                                summary_parts.append("```")
+                            
+                            summary_parts.append("")
                         
+                        # Tất cả đánh giá
                         if evaluation.get("all_evaluations"):
-                            summary_parts.append("- **Tất cả đánh giá:**")
+                            summary_parts.append("**📋 Tất cả đánh giá:**")
                             for eval_item in evaluation["all_evaluations"]:
                                 eval_job = eval_item.get("job_title", "Unknown")
                                 eval_score = eval_item.get("score", 0)
-                                summary_parts.append(f"  - {eval_job}: {eval_score}%")
+                                eval_color = "🟢" if eval_score >= 70 else "🟡" if eval_score >= 50 else "🔴"
+                                summary_parts.append(f"- {eval_job}: {eval_color} {eval_score}%")
+                            summary_parts.append("")
                         
+                        summary_parts.append("---")
                         summary_parts.append("")
                 
                 summary_parts.append("")
