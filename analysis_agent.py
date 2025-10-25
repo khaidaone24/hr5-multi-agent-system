@@ -43,7 +43,6 @@ class AnalysisAgent:
     
     def _extract_agent_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Trích xuất và phân loại kết quả từ các agent"""
-        print(f"🧠 Analysis Agent: Extracting from {len(results)} results")
         agent_results = {
             "query_agent": None,
             "cv_agent": None,
@@ -51,14 +50,11 @@ class AnalysisAgent:
             "analysis_agent": None
         }
         
-        for i, result in enumerate(results):
+        for result in results:
             agent_name = result.get("agent", "unknown")
-            print(f"🧠 Analysis Agent: Result {i}: agent={agent_name}, status={result.get('status')}")
             if agent_name in agent_results:
                 agent_results[agent_name] = result
-                print(f"🧠 Analysis Agent: Added {agent_name} to results")
         
-        print(f"🧠 Analysis Agent: Final extracted results: {list(agent_results.keys())}")
         return agent_results
 
     def _list_of_dicts_to_table(self, items: Any) -> Optional[Dict[str, Any]]:
@@ -311,7 +307,7 @@ class AnalysisAgent:
             elif agent_name == "chart_agent":
                 if key_data["files_created"]:
                     return f"✅ Tạo biểu đồ thành công: {key_data['data_summary']}"
-            else:
+                else:
                     return "✅ Tạo biểu đồ thành công"
             else:
                 return "✅ Xử lý thành công"
@@ -355,7 +351,6 @@ class AnalysisAgent:
     
     def _create_formatted_summary(self, agent_results: Dict[str, Any], user_input: str) -> str:
         """Tạo summary được format đẹp mắt"""
-        print(f"🧠 Analysis Agent: Creating formatted summary for {len(agent_results)} agents")
         summary_parts = []
         
         # Header
@@ -580,10 +575,7 @@ class AnalysisAgent:
                 
                 summary_parts.append("")
         
-        result = "\n".join(summary_parts)
-        print(f"🧠 Analysis Agent: Formatted summary created, length: {len(result)}")
-        print(f"🧠 Analysis Agent: Summary preview: {result[:300]}...")
-        return result
+        return "\n".join(summary_parts)
     
     def _summarize_table_for_user(self, table_data: Dict[str, Any]) -> str:
         """Tạo tóm tắt bảng dữ liệu cho người dùng bằng LLM."""
@@ -790,7 +782,7 @@ class AnalysisAgent:
                                         cv_summary.append(f"![Donut Chart]({chart_file})")
                                         cv_summary.append(f"*Biểu đồ: {donut_result.get('title', 'Đánh giá phù hợp')}*")
                                         cv_summary.append("")
-                                else:
+                                    else:
                                         # Fallback to text chart
                                         cv_summary.append("**📈 Biểu đồ đánh giá:**")
                                         cv_summary.append("```")
@@ -966,7 +958,6 @@ Yêu cầu định dạng câu trả lời:
         try:
             print(f"🧠 Analysis Agent: Tổng hợp kết quả cho '{user_input}'")
             print(f"🧠 Analysis Agent: Số lượng agent results: {len(agent_results) if agent_results else 0}")
-            print(f"🧠 Analysis Agent: Agent results: {agent_results}")
             
             if not agent_results:
                 return {
@@ -1022,7 +1013,6 @@ Yêu cầu định dạng câu trả lời:
             
             # Trích xuất và phân loại kết quả từ các agent
             extracted_results = self._extract_agent_results(agent_results)
-            print(f"🧠 Analysis Agent: Extracted results: {extracted_results}")
             
             # Tạo báo cáo tổng hợp với format đẹp
             summary_report = self._create_summary_report(extracted_results, user_input)
@@ -1032,8 +1022,6 @@ Yêu cầu định dạng câu trả lời:
             
             # Tạo markdown summary đẹp mắt (đã có đầy đủ thông tin)
             markdown_summary = summary_report.get("formatted_summary", "")
-            print(f"🧠 Analysis Agent: Markdown summary length: {len(markdown_summary)}")
-            print(f"🧠 Analysis Agent: Markdown preview: {markdown_summary[:200]}...")
 
             return {
                 "agent": "analysis_agent",
