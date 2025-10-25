@@ -36,26 +36,22 @@ class QueryAgent:
             print(" Warning: DB_LINK not found. Database features disabled.")
             self.DB_LINK = None
         
-        # Cấu hình MCP Client (fallback to direct DB connection on Railway)
-        if os.getenv('RAILWAY_ENVIRONMENT'):
-            print(" Query Agent: Railway environment detected - using direct DB connection")
-            self.config = None  # Will use direct PostgreSQL connection
-        else:
-                self.config = {
-                    "mcpServers": {
-                        "postgres": {
-                            "command": "uv",
-                            "args": [
-                                "run",
-                                "postgres-mcp",
-                                "--access-mode=unrestricted",
-                            ],
-                            "env": {
-                                "DATABASE_URI": self.DB_LINK
-                            },
-                        }
-                    }
+        # Cấu hình MCP Client cho cả local và Railway
+        self.config = {
+            "mcpServers": {
+                "postgres": {
+                    "command": "uv",
+                    "args": [
+                        "run",
+                        "postgres-mcp",
+                        "--access-mode=unrestricted",
+                    ],
+                    "env": {
+                        "DATABASE_URI": self.DB_LINK
+                    },
                 }
+            }
+        }
         
         # Initialize schema-related attributes
         self.schema_details = {}
@@ -65,10 +61,10 @@ class QueryAgent:
         self.llm = None
         
     async def _run_sql(self, sql: str) -> dict:
-        # Check if client is available (Railway fallback)
+        # Check if client is available
         if not self.client:
-            print("❌ Query Agent - MCP Client không khả dụng trên Railway")
-            return await self._railway_fallback_sql(sql)
+            print("❌ Query Agent - MCP Client không khả dụng")
+            return {"columns": ["error"], "data": [["MCP Client not available"]]}
             
         try:
             session = self.client.get_session("postgres")
@@ -131,69 +127,6 @@ class QueryAgent:
             # try list_objects/dry path
             return {"columns": ["result"], "data": [["Query failed"]]}
     
-    async def _railway_fallback_sql(self, sql: str) -> dict:
-        """Fallback SQL execution cho Railway - sử dụng mock data"""
-        print(f"🔄 Query Agent - Railway fallback SQL: {sql}")
-        
-        # Mock data cho Railway environment
-        mock_data = {
-            "count": {
-                "SELECT COUNT(*) FROM nhan_vien": {
-                    "columns": ["count"],
-                    "data": [[25]]
-                },
-                "SELECT COUNT(*) FROM phong_ban": {
-                    "columns": ["count"], 
-                    "data": [[3]]
-                }
-            },
-            "salary": {
-                "ORDER BY.*luong_co_ban.*DESC.*LIMIT 1": {
-                    "columns": ["ho_ten", "luong_co_ban"],
-                    "data": [["Nguyễn Văn A", 20000000.0]]
-                },
-                "ORDER BY.*luong_co_ban.*ASC.*LIMIT 1": {
-                    "columns": ["ho_ten", "luong_co_ban"],
-                    "data": [["Lê Thị H", 8000000.0]]
-                }
-            },
-            "department": {
-                "GROUP BY.*phong_ban": {
-                    "columns": ["ten_phong_ban", "so_nhan_vien"],
-                    "data": [
-                        ["Phòng Nhân sự", 8],
-                        ["Phòng IT", 6], 
-                        ["Phòng Kế toán", 11]
-                    ]
-                }
-            }
-        }
-        
-        # Tìm mock data phù hợp
-        sql_lower = sql.lower().strip()
-        
-        # Check count queries
-        if "count" in sql_lower and "nhan_vien" in sql_lower:
-            return mock_data["count"]["SELECT COUNT(*) FROM nhan_vien"]
-        elif "count" in sql_lower and "phong_ban" in sql_lower:
-            return mock_data["count"]["SELECT COUNT(*) FROM phong_ban"]
-        
-        # Check salary queries
-        elif "luong_co_ban" in sql_lower and "desc" in sql_lower:
-            return mock_data["salary"]["ORDER BY.*luong_co_ban.*DESC.*LIMIT 1"]
-        elif "luong_co_ban" in sql_lower and "asc" in sql_lower:
-            return mock_data["salary"]["ORDER BY.*luong_co_ban.*ASC.*LIMIT 1"]
-        
-        # Check department queries
-        elif "group by" in sql_lower and "phong_ban" in sql_lower:
-            return mock_data["department"]["GROUP BY.*phong_ban"]
-        
-        # Default mock data
-        print("⚠️ Query Agent - Sử dụng default Railway mock data")
-        return {
-            "columns": ["message"],
-            "data": [["Railway environment - Mock data (MCP Client không khả dụng)"]]
-        }
 
     async def get_table_details(self, table_name: str) -> dict:
         """Lấy thông tin chi tiết của một bảng cụ thể"""
@@ -490,20 +423,6 @@ class QueryAgent:
     async def initialize(self):
         """Khởi tạo MCP Client và Agent với Schema Awareness"""
         if self.client is None:
-            # Check if we're in Railway/production environment
-            if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('PORT'):
-                print(" Query Agent: Detected production environment - skipping MCP Client")
-                # In Railway, we skip MCP Client and use fallback mechanism
-                self.client = None
-                self.agent = None
-                # Initialize LLM for fallback
-                self.llm = ChatGoogleGenerativeAI(
-                    model="models/gemini-2.5-flash-lite",
-                    google_api_key=self.GEMINI_API_KEY,
-                    temperature=0.2,
-                )
-                return
-            
             try:
                 print(" Query Agent: Dang khoi tao MCP Client...")
                 
