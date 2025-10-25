@@ -170,9 +170,12 @@ class AnalysisAgent:
             logger.info(f"Donut chart result: {result}")
             
             if "chart_file" in result:
-                lines.append(f"![Donut Chart]({result['chart_file']})")
+                # Convert path to API route
+                chart_filename = result.get('chart_filename', '')
+                api_path = f"/api/charts/{chart_filename}"
+                lines.append(f"![Donut Chart]({api_path})")
                 lines.append(f"*{result.get('title', 'Đánh giá phù hợp')}*")
-                logger.info(f"Donut chart created successfully: {result['chart_file']}")
+                logger.info(f"Donut chart created successfully: {api_path}")
             else:
                 logger.warning("No chart_file in result, using text chart")
                 lines.extend(self._create_text_chart(score))
