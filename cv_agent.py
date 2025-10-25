@@ -46,6 +46,60 @@ class CVAgent:
         self._quota_tracker = {"minute": 0, "count": 0}
         self._max_requests_per_minute = 15
     
+    def _extract_json_from_text(self, text: str) -> str:
+        """Trích xuất JSON object từ text"""
+        try:
+            # Tìm { đầu tiên và } cuối cùng
+            start = text.find('{')
+            if start == -1:
+                return ""
+            
+            # Đếm braces để tìm } cuối cùng
+            brace_count = 0
+            end = start
+            for i, char in enumerate(text[start:], start):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end = i + 1
+                        break
+            
+            return text[start:end]
+        except:
+            return ""
+    
+    def _fix_json_quotes(self, text: str) -> str:
+        """Sửa quotes trong JSON"""
+        try:
+            # Thay thế smart quotes bằng regular quotes
+            text = text.replace('"', '"').replace('"', '"')
+            text = text.replace(''', "'").replace(''', "'")
+            
+            # Sửa unterminated strings
+            text = re.sub(r'"[^"]*$', '"', text)  # Thêm quote cuối cho string chưa kết thúc
+            text = re.sub(r'"[^"]*"', lambda m: m.group(0) if m.group(0).count('"') % 2 == 0 else m.group(0) + '"', text)
+            
+            return text
+        except:
+            return ""
+    
+    def _extract_clean_json(self, text: str) -> str:
+        """Trích xuất JSON sạch từ text"""
+        try:
+            # Tìm JSON object hoàn chỉnh
+            json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+            matches = re.findall(json_pattern, text, re.DOTALL)
+            
+            if matches:
+                # Lấy match dài nhất (có thể là JSON hoàn chỉnh nhất)
+                return max(matches, key=len)
+            
+            return ""
+        except:
+            return ""
+    
     def _check_quota(self) -> Dict[str, Any]:
         """Kiểm tra quota Gemini"""
         current_minute = int(time.time() / 60)
@@ -209,44 +263,26 @@ KEY CANDIDATE INFO:
 === JOB REQUIREMENTS ===
 {job_text[:2000]}
 
-Evaluate the match (0-100) based on these specific criteria:
-1. Job Title/Role alignment (Chức danh)
-2. Skills match (Kỹ năng) 
-3. Experience level (Kinh nghiệm)
-4. Education background (Học vấn)
+Evaluate the match (0-100) based on:
+1. Job Title alignment
+2. Skills match  
+3. Experience level
+4. Education background
 
-For each criteria, provide:
-- Score (0-100)
-- Detailed analysis
-- Strengths and weaknesses
-
-IMPORTANT: Return ONLY valid JSON format. Do not include any text before or after the JSON. 
-Ensure all strings are properly escaped and quotes are balanced.
+IMPORTANT: Return ONLY valid JSON. Keep analysis short (max 100 chars each).
 
 Return ONLY this JSON format:
 {{
     "overall_score": <integer 0-100>,
     "detailed_scores": {{
-        "job_title": {{
-            "score": <integer 0-100>,
-            "analysis": "<detailed analysis>"
-        }},
-        "skills": {{
-            "score": <integer 0-100>,
-            "analysis": "<detailed analysis>"
-        }},
-        "experience": {{
-            "score": <integer 0-100>,
-            "analysis": "<detailed analysis>"
-        }},
-        "education": {{
-            "score": <integer 0-100>,
-            "analysis": "<detailed analysis>"
-        }}
+        "job_title": {{"score": <integer>, "analysis": "<short analysis>"}},
+        "skills": {{"score": <integer>, "analysis": "<short analysis>"}},
+        "experience": {{"score": <integer>, "analysis": "<short analysis>"}},
+        "education": {{"score": <integer>, "analysis": "<short analysis>"}}
     }},
-    "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-    "weaknesses": ["<weakness 1>", "<weakness 2>", "<weakness 3>"],
-    "summary": "<2-3 sentences explaining the overall score>"
+    "strengths": ["<strength 1>", "<strength 2>"],
+    "weaknesses": ["<weakness 1>", "<weakness 2>"],
+    "summary": "<brief summary>"
 }}
 """
         
@@ -271,7 +307,7 @@ Return ONLY this JSON format:
                 prompt,
                 generation_config=genai.GenerationConfig(
                     temperature=0.3,
-                    max_output_tokens=500,
+                    max_output_tokens=2000,  # Tăng token limit
                     top_p=0.8,
                 ),
                 safety_settings=safety_settings
@@ -285,6 +321,13 @@ Return ONLY this JSON format:
             result_text = response.text
             print(f" CV Agent: Raw response length: {len(result_text)}")
             print(f" CV Agent: Raw response preview: {result_text[:200]}...")
+            
+            # Kiểm tra nếu response bị cắt
+            if not result_text.strip().endswith('}') and '{' in result_text:
+                print(f" CV Agent: Response appears to be truncated, attempting to fix...")
+                # Thêm } cuối nếu thiếu
+                if result_text.count('{') > result_text.count('}'):
+                    result_text += '}'
             
             # Clean markdown và xử lý JSON
             if "```json" in result_text:
@@ -300,17 +343,33 @@ Return ONLY this JSON format:
                 print(f" CV Agent: JSON parsing error: {json_err}")
                 print(f" CV Agent: Problematic JSON: {result_text[:500]}...")
                 
-                # Thử sửa JSON bằng cách loại bỏ các ký tự đặc biệt
-                cleaned_json = result_text.replace('\n', ' ').replace('\r', ' ')
-                cleaned_json = re.sub(r'[^\x20-\x7E]', '', cleaned_json)  # Chỉ giữ ASCII printable
+                # Thử nhiều cách sửa JSON
+                json_attempts = [
+                    # 1. Loại bỏ ký tự đặc biệt
+                    re.sub(r'[^\x20-\x7E]', '', result_text.replace('\n', ' ').replace('\r', ' ')),
+                    # 2. Tìm JSON object trong text
+                    self._extract_json_from_text(result_text),
+                    # 3. Sửa quotes không đúng
+                    self._fix_json_quotes(result_text),
+                    # 4. Loại bỏ text trước và sau JSON
+                    self._extract_clean_json(result_text)
+                ]
                 
-                try:
-                    result = json.loads(cleaned_json)
-                    return result.get("overall_score", 0), result.get("summary", ""), result
-                except:
-                    # Fallback: tạo kết quả mặc định
-                    print(f" CV Agent: Using fallback result due to JSON parsing failure")
-                    return 0, f"JSON parsing error: {str(json_err)[:100]}", {}
+                for i, cleaned_json in enumerate(json_attempts):
+                    if not cleaned_json:
+                        continue
+                    try:
+                        print(f" CV Agent: Trying JSON fix attempt {i+1}")
+                        result = json.loads(cleaned_json)
+                        print(f" CV Agent: JSON parsing successful with attempt {i+1}")
+                        return result.get("overall_score", 0), result.get("summary", ""), result
+                    except Exception as e:
+                        print(f" CV Agent: Attempt {i+1} failed: {str(e)[:50]}")
+                        continue
+                
+                # Fallback: tạo kết quả mặc định
+                print(f" CV Agent: All JSON parsing attempts failed, using fallback")
+                return 0, f"JSON parsing error: {str(json_err)[:100]}", {}
             
         except Exception as e:
             error_msg = str(e)
