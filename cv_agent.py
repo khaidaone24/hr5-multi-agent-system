@@ -287,6 +287,7 @@ Return ONLY this JSON format:
 """
         
         try:
+            print(f" CV Agent: Gọi Gemini API cho job...")
             # Check quota
             quota = self._check_quota()
             if not quota["available"]:
@@ -374,6 +375,7 @@ Return ONLY this JSON format:
                 return 0, f"JSON parsing error: {str(json_err)[:100]}", {}
             
         except Exception as e:
+            print(f" CV Agent: Lỗi trong compare_cv_job_with_gemini: {e}")
             error_msg = str(e)
             
             if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
@@ -581,6 +583,7 @@ Return ONLY this JSON format:
                 """
                 
                 try:
+                    print(f" CV Agent: Bắt đầu đánh giá {job_title}...")
                     # Sử dụng Gemini để đánh giá với phân tích chi tiết
                     score, analysis, detailed_result = self.compare_cv_job_with_gemini(cv_text, job_text, cv_key_info)
                     print(f" CV Agent: Kết quả đánh giá {job_title}: {score}%")
@@ -643,6 +646,7 @@ Return ONLY this JSON format:
                     print(f"{'='*60}\n")
                 except Exception as e:
                     print(f" CV Agent: Lỗi đánh giá {job_title}: {e}")
+                    print(f" CV Agent: Tiếp tục với job tiếp theo...")
                     evaluations.append({
                         "job_title": job_title,
                         "score": 0,
