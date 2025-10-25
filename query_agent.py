@@ -382,64 +382,68 @@ class QueryAgent:
             )
         return None
 
-    def _summarize_table(self, question: str, table: dict) -> str:
+    async def _generate_llm_summary(self, question: str, table: dict) -> str:
+        """Sử dụng LLM để tạo phản hồi thân thiện từ dữ liệu SQL"""
         try:
-            cols = [str(c).lower() for c in table.get("columns", [])]
+            # Khởi tạo LLM
+            llm = ChatGoogleGenerativeAI(
+                model="models/gemini-2.5-flash-lite",
+                google_api_key=os.getenv("GOOGLE_API_KEY"),
+                temperature=0.3,
+            )
+            
+            cols = table.get("columns", [])
+            data = table.get("data", [])
+            
+            # Chuẩn bị dữ liệu cho LLM
+            data_sample = data[:10] if len(data) > 10 else data  # Chỉ lấy 10 dòng đầu để tiết kiệm token
+            
+            prompt = f"""
+Bạn là một AI Assistant chuyên chuyển đổi dữ liệu SQL thành phản hồi thân thiện với người dùng.
+
+Câu hỏi của người dùng: "{question}"
+Các cột dữ liệu: {cols}
+Dữ liệu trả về: {data_sample}
+Tổng số bản ghi: {len(data)}
+
+Hãy tạo một phản hồi ngắn gọn, thân thiện và chính xác:
+
+1. **Phân tích context** từ câu hỏi và dữ liệu
+2. **Xác định loại dữ liệu** (nhân viên, phòng ban, dự án, etc.)
+3. **Tạo phản hồi phù hợp** với context
+4. **Format số tiền** thành VNĐ với dấu phẩy
+5. **Ngôn ngữ tiếng Việt** tự nhiên
+6. **Chỉ 1-2 câu** ngắn gọn
+
+Ví dụ:
+- Nếu là lương phòng ban: "Phòng ban có lương trung bình cao nhất là Phòng Nhân sự với mức lương 12,888,889 VNĐ."
+- Nếu là lương nhân viên: "Nhân viên có lương cao nhất là Nguyễn Văn A với mức lương 15,000,000 VNĐ."
+- Nếu là thống kê: "Có 3 phòng ban trong hệ thống với tổng cộng 25 nhân viên."
+
+Chỉ trả về phản hồi, không cần giải thích thêm.
+"""
+            
+            response = await llm.ainvoke(prompt)
+            return response.content if hasattr(response, 'content') else str(response)
+            
+        except Exception as e:
+            logging.error(f"Error generating LLM summary: {e}")
+            return f"Đã truy vấn thành công. Có {len(data)} bản ghi được trả về."
+
+    async def _summarize_table(self, question: str, table: dict) -> str:
+        """Sử dụng LLM để tạo phản hồi thân thiện từ dữ liệu SQL"""
+        try:
+            cols = table.get("columns", [])
             data = table.get("data", [])
             if not cols or not data:
                 return ""
-            # Lương thấp nhất
-            if any("luong" in c for c in cols) and any("ho_ten" == c or "ten" in c for c in cols) and len(data) >= 1:
-                try:
-                    name_idx = next(i for i,c in enumerate(cols) if c == "ho_ten" or "ten" in c)
-                    sal_idx = next(i for i,c in enumerate(cols) if "luong" in c)
-                    name = data[0][name_idx]
-                    sal = data[0][sal_idx]
-                    # Xác định context dựa trên cột dữ liệu
-                    if "phong_ban" in cols or "ten_phong_ban" in cols:
-                        return f"Phòng ban có lương trung bình thấp nhất là {name} với mức lương {sal:,.0f} VNĐ."
-                    else:
-                        return f"Nhân viên có lương thấp nhất là {name} với mức lương {sal:,.0f} VNĐ."
-                except Exception:
-                    pass
-            # Lương cao nhất
-            if any("luong" in c for c in cols) and any("ho_ten" == c or "ten" in c for c in cols) and len(data) >= 1:
-                try:
-                    name_idx = next(i for i,c in enumerate(cols) if c == "ho_ten" or "ten" in c)
-                    sal_idx = next(i for i,c in enumerate(cols) if "luong" in c)
-                    name = data[0][name_idx]
-                    sal = data[0][sal_idx]
-                    # Xác định context dựa trên cột dữ liệu
-                    if "phong_ban" in cols or "ten_phong_ban" in cols:
-                        return f"Phòng ban có lương trung bình cao nhất là {name} với mức lương {sal:,.0f} VNĐ."
-                    else:
-                        return f"Nhân viên có lương cao nhất là {name} với mức lương {sal:,.0f} VNĐ."
-                except Exception:
-                    pass
-            # Số lượng nhân viên theo phòng ban
-            if ("phong_ban" in cols or "phongban" in cols or "phong ban" in question.lower()) and any("so_luong" in c or "so_nhan_vien" in c for c in cols):
-                try:
-                    dept_idx = next(i for i,c in enumerate(cols) if c in ("phong_ban","phongban","phongban","phong ban","ten_phong_ban"))
-                    cnt_idx = next(i for i,c in enumerate(cols) if "so_luong" in c or "so_nhan_vien" in c)
-                    top = data[:3]
-                    parts = [f"{row[dept_idx]}: {row[cnt_idx]}" for row in top]
-                    return "Số lượng nhân viên theo phòng ban (top 3): " + ", ".join(parts) + "."
-                except Exception:
-                    pass
-            # Lương trung bình theo phòng ban
-            if any("trung_binh" in c for c in cols) and ("phong_ban" in cols or "ten_phong_ban" in cols):
-                try:
-                    dept_idx = next(i for i,c in enumerate(cols) if c in ("phong_ban","ten_phong_ban"))
-                    avg_idx = next(i for i,c in enumerate(cols) if "trung_binh" in c)
-                    top = data[:3]
-                    parts = [f"{row[dept_idx]}: {row[avg_idx]}" for row in top]
-                    return "Lương trung bình theo phòng ban (top 3): " + ", ".join(parts) + "."
-                except Exception:
-                    pass
-            # Mặc định: thông báo số dòng
-            return f"Đã truy vấn thành công {len(data)} dòng dữ liệu."
-        except Exception:
-            return ""
+            
+            # Sử dụng LLM để tạo phản hồi thân thiện
+            return await self._generate_llm_summary(question, table)
+            
+        except Exception as e:
+            logging.error(f"Error in _summarize_table: {e}")
+            return f"Đã truy vấn thành công. Có {len(data)} bản ghi được trả về."
 
     async def _load_schema_details(self):
         """Lấy thông tin chi tiết các bảng quan trọng"""
